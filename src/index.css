@@ -18,9 +18,9 @@ html {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Fondo puro negro en dark, blanco en light */
-html.dark  { background-color: #000000; color-scheme: dark;  }
-html:not(.dark) { background-color: #ffffff; color-scheme: light; }
+/* Fondo global: zinc-950 en dark, zinc-50 en light */
+html.dark  { background-color: #09090b; color-scheme: dark;  }
+html:not(.dark) { background-color: #fafafa; color-scheme: light; }
 
 body {
   margin: 0;

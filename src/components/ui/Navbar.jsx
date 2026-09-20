@@ -18,13 +18,13 @@ export function Navbar() {
     <>
       {/* ── Sidebar para escritorio ─────────────────────────────────── */}
       <nav className="hidden md:flex flex-col fixed left-0 top-0 h-full w-16 lg:w-56
-                      bg-black dark:bg-black border-r border-white/8 z-40 py-6 transition-all">
+                      bg-white border-r border-zinc-200 dark:bg-zinc-950 dark:border-zinc-800 z-40 py-6 transition-all">
         {/* Logo */}
         <div className="px-4 mb-8 flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-[var(--accent)] flex items-center justify-center shrink-0">
+          <div className="w-8 h-8 rounded-lg bg-[var(--accent-color)] flex items-center justify-center shrink-0 shadow-sm">
             <span className="text-white font-bold text-sm">KT</span>
           </div>
-          <span className="hidden lg:block text-white font-semibold text-sm">KT-Pagos</span>
+          <span className="hidden lg:block text-zinc-900 dark:text-white font-semibold text-sm">KT-Pagos</span>
         </div>
 
         {/* Links */}
@@ -35,11 +35,11 @@ export function Navbar() {
               to={to}
               end={to === '/'}
               className={({ isActive }) => cn(
-                'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium',
+                'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm',
                 'transition-all duration-200 ease-in-out group relative',
                 isActive
-                  ? 'bg-[var(--accent-color)]/10 text-[var(--accent-color)] border border-[var(--accent-color)]/30 font-semibold shadow-sm'
-                  : 'text-zinc-400 hover:text-white hover:bg-white/5 border border-transparent hover:border-white/5'
+                  ? 'bg-[var(--accent-color)] text-white shadow-md font-medium'
+                  : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-white/5 font-normal'
               )}
             >
               <Icon size={18} className="shrink-0 transition-transform duration-200 group-hover:scale-110" />
@@ -51,19 +51,19 @@ export function Navbar() {
 
       {/* ── Bottom bar para móvil ────────────────────────────────────── */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40
-                      bg-black/95 dark:bg-black/95 backdrop-blur-md border-t border-white/10
-                      flex items-center justify-around px-2 py-1 safe-area-inset-bottom">
+                      bg-white/95 border-t border-zinc-200 dark:bg-zinc-950/95 dark:border-zinc-800 backdrop-blur-md
+                      flex items-center justify-around px-2 py-1.5 safe-area-inset-bottom">
         {NAV_ITEMS.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
             to={to}
             end={to === '/'}
             className={({ isActive }) => cn(
-              'flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl text-xs font-medium',
+              'flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl text-xs',
               'transition-all duration-200 ease-in-out',
               isActive
-                ? 'bg-[var(--accent-color)]/15 text-[var(--accent-color)]'
-                : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/5'
+                ? 'bg-[var(--accent-color)] text-white shadow-sm font-medium'
+                : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-white/5'
             )}
           >
             <Icon size={20} className="transition-transform duration-200" />

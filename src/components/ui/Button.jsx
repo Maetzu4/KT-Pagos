@@ -3,9 +3,9 @@ import { cn } from '../../lib/utils';
 
 const variants = {
   primary: 'bg-[var(--accent-color)] text-white hover:opacity-90 focus-visible:ring-[var(--accent-color)] shadow-sm',
-  ghost:   'bg-transparent text-current border border-white/10 hover:border-[var(--accent-color)] hover:text-[var(--accent-color)]',
-  danger:  'bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20',
-  subtle:  'bg-white/5 dark:bg-white/5 hover:bg-white/10 text-current',
+  ghost:   'bg-transparent text-current hover:bg-[var(--accent-color)] hover:text-white transition-all [&_svg]:hover:text-white',
+  danger:  'bg-[var(--accent-color)]/10 text-[var(--accent-color)] hover:bg-[var(--accent-color)] hover:text-white transition-all [&_svg]:hover:text-white',
+  subtle:  'bg-zinc-100 dark:bg-white/5 hover:bg-zinc-200 dark:hover:bg-white/10 text-current',
 };
 
 const sizes = {

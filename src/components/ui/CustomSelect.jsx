@@ -75,14 +75,14 @@ export function CustomSelect({
         onKeyDown={handleKeyDown}
         className={cn(
           'w-full h-10 flex items-center justify-between gap-2 rounded-lg px-3 text-sm',
-          'bg-white/5 border text-left',
+          'bg-transparent dark:bg-zinc-900/40 border text-left',
           'transition-all duration-200 ease-in-out',
-          'focus:outline-none',
+          'outline-none focus:outline-none focus:border-[var(--accent-color)] focus:ring-1 focus:ring-[var(--accent-color)] focus:ring-offset-0 focus:ring-offset-transparent',
           'disabled:opacity-40 disabled:cursor-not-allowed',
           open
-            ? 'border-[var(--accent-color)] ring-1 ring-[var(--accent-color)]/30'
-            : 'border-white/10 hover:border-white/25',
-          selectedOption ? 'text-white dark:text-white' : 'text-zinc-500',
+            ? 'border-[var(--accent-color)] ring-1 ring-[var(--accent-color)]'
+            : 'border-zinc-300 dark:border-white/10 hover:border-zinc-400 dark:hover:border-white/25',
+          selectedOption ? 'text-zinc-900 dark:text-white' : 'text-zinc-400 dark:text-zinc-500',
           className
         )}
       >
@@ -103,8 +103,8 @@ export function CustomSelect({
         <div
           role="listbox"
           className={cn(
-            'absolute z-50 w-full mt-1.5 rounded-xl border border-white/12',
-            'bg-zinc-950 dark:bg-zinc-950 shadow-2xl shadow-black/60',
+            'absolute z-50 w-full mt-1.5 rounded-xl border border-zinc-200 dark:border-zinc-800',
+            'bg-white dark:bg-zinc-900 shadow-xl dark:shadow-2xl dark:shadow-black/60',
             'overflow-hidden animate-slide-up',
             'max-h-60 overflow-y-auto'
           )}
@@ -128,8 +128,8 @@ export function CustomSelect({
                     'w-full flex items-center justify-between gap-3 px-4 py-2.5 text-sm text-left',
                     'transition-all duration-150',
                     isSelected
-                      ? 'bg-[var(--accent-color)]/15 text-[var(--accent-color)] font-medium'
-                      : 'text-zinc-200 hover:bg-white/5 hover:text-white'
+                      ? 'bg-[var(--accent-color)]/10 dark:bg-[var(--accent-color)]/15 text-[var(--accent-color)] font-medium'
+                      : 'text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800/60 dark:hover:text-white'
                   )}
                 >
                   <span className="truncate">{option.label}</span>

@@ -141,8 +141,8 @@ export function ClaseForm({ initial, initialGroupId, grupos = [], onSubmit, onCa
               label={form.es_extra ? 'Sí' : 'No'}
             />
             {precioPreview !== null && (
-              <span className="text-sm font-mono text-[var(--accent-color)] bg-[var(--accent-color)]/10 px-2.5 py-1 rounded-lg border border-[var(--accent-color)]/20">
-                {formatCurrency(precioPreview)} {needsRecalc ? '(nuevo snapshot)' : '(snapshot guardado)'}
+              <span className="text-sm font-mono bg-[var(--accent-color)]/10 text-[var(--accent-color)] border border-transparent px-3 py-1 rounded-md">
+                {formatCurrency(precioPreview)}
               </span>
             )}
           </div>

@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Plus, Pencil, Trash2, ExternalLink, Search } from 'lucide-react';
+import { Plus, Pencil, Trash2, ExternalLink, Search, AlertTriangle } from 'lucide-react';
 import { Table } from '../components/ui/Table';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
+import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { CustomSelect } from '../components/ui/CustomSelect';
 import { ClaseForm } from '../components/forms/ClaseForm';
 import { useClases } from '../hooks/useClases';
@@ -21,6 +22,7 @@ export default function Clases() {
   const [search,        setSearch]        = useState('');
   const [modal,         setModal]         = useState(null);
   const [deleting,      setDeleting]      = useState(null);
+  const [confirmId,     setConfirmId]     = useState(null); // id para ConfirmDialog
 
   const { clases, loading, createClase, updateClase, deleteClase, toggleReclamo } =
     useClases({ grupo_id: filtroGrupo || undefined, periodo_id: filtroPeriodo || undefined });
@@ -47,10 +49,11 @@ export default function Clases() {
     closeModal();
   };
 
-  const handleDelete = async (id) => {
-    if (!confirm('¿Eliminar esta clase?')) return;
-    setDeleting(id);
-    try { await deleteClase(id); } finally { setDeleting(null); }
+  const handleDeleteConfirm = async () => {
+    if (!confirmId) return;
+    setDeleting(confirmId);
+    setConfirmId(null);
+    try { await deleteClase(confirmId); } finally { setDeleting(null); }
   };
 
   const grupoOptions = [
@@ -88,16 +91,18 @@ export default function Clases() {
     },
     {
       key: 'en_reclamo',
-      header: '⚠️',
-      cellClassName: 'text-center',
+      header: '',
+      cellClassName: 'text-center w-10',
       render: (r) => (
         <button
           onClick={(e) => { e.stopPropagation(); toggleReclamo(r.id); }}
           title={r.en_reclamo ? 'En reclamo — clic para quitar' : 'Marcar en reclamo'}
-          className={`text-lg transition-all hover:scale-125 ${r.en_reclamo ? 'opacity-100' : 'opacity-20 hover:opacity-60'}`}
+          className={`flex items-center justify-center transition-all hover:scale-110 ${
+            r.en_reclamo ? 'text-[var(--accent-color)] opacity-100' : 'text-zinc-400 opacity-30 hover:opacity-70'
+          }`}
           aria-label={r.en_reclamo ? 'Quitar reclamo' : 'Marcar en reclamo'}
         >
-          ⚠️
+          <AlertTriangle size={15} />
         </button>
       ),
     },
@@ -120,7 +125,7 @@ export default function Clases() {
       header: '',
       cellClassName: 'text-right',
       render: (r) => (
-        <div className="flex gap-2 justify-end" onClick={(e) => e.stopPropagation()}>
+        <div className="flex gap-1.5 justify-end" onClick={(e) => e.stopPropagation()}>
           <Button size="icon" variant="ghost" onClick={() => openEdit(r)} aria-label="Editar">
             <Pencil size={13} />
           </Button>
@@ -128,7 +133,7 @@ export default function Clases() {
             size="icon"
             variant="danger"
             loading={deleting === r.id}
-            onClick={() => handleDelete(r.id)}
+            onClick={() => setConfirmId(r.id)}
             aria-label="Eliminar"
           >
             <Trash2 size={13} />
@@ -142,7 +147,7 @@ export default function Clases() {
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-white">Clases</h1>
+          <h1 className="text-2xl font-semibold text-zinc-900 dark:text-white">Clases</h1>
           <p className="text-sm text-zinc-500 mt-1">
             {clasesFiltradas.length} de {clases.length} clases
           </p>
@@ -162,7 +167,7 @@ export default function Clases() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar clase, grupo o periodo…"
-            className="w-64 h-9 pl-9 pr-3 text-sm rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-zinc-500 focus:outline-none focus:border-[var(--accent-color)] focus:ring-1 focus:ring-[var(--accent-color)]/30 transition-all duration-200"
+            className="w-64 h-9 pl-9 pr-3 text-sm rounded-lg bg-white dark:bg-white/5 border border-zinc-300 dark:border-white/10 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none focus:border-[var(--accent-color)] focus:ring-1 focus:ring-[var(--accent-color)]/30 transition-all duration-200"
           />
         </div>
 
@@ -209,7 +214,7 @@ export default function Clases() {
         }
       />
 
-      {/* ── Modal ── */}
+      {/* ── Modal Editar / Crear ── */}
       <Modal
         open={!!modal}
         onClose={closeModal}
@@ -222,6 +227,17 @@ export default function Clases() {
           onCancel={closeModal}
         />
       </Modal>
+
+      {/* ── ConfirmDialog eliminar ── */}
+      <ConfirmDialog
+        open={!!confirmId}
+        title="Eliminar clase"
+        message="Esta acción es irreversible. La clase y su precio snapshot serán eliminados permanentemente."
+        confirmText="Eliminar"
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setConfirmId(null)}
+        destructive
+      />
     </div>
   );
 }

@@ -9,7 +9,7 @@ import Configuracion from './pages/Configuracion';
 
 function Layout({ children }) {
   return (
-    <div className="min-h-screen bg-white dark:bg-black text-zinc-900 dark:text-zinc-100 font-sans">
+    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-sans">
       <Navbar />
       {/* Contenido principal: offset para sidebar en desktop, padding-bottom en mobile */}
       <main className="md:pl-16 lg:pl-56 pb-20 md:pb-0 transition-all">

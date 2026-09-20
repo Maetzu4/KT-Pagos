@@ -6,6 +6,7 @@ import { Toggle } from '../components/ui/Toggle';
 import { ColorPicker } from '../components/ui/ColorPicker';
 import { FormField, Input } from '../components/ui/FormField';
 import { Modal } from '../components/ui/Modal';
+import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { Table } from '../components/ui/Table';
 import { useTarifas } from '../hooks/useTarifas';
 import { useTheme } from '../context/ThemeContext';
@@ -92,6 +93,7 @@ export default function Configuracion() {
 
   const [modal,    setModal]    = useState(null); // null | 'create' | tarifa
   const [deleting, setDeleting] = useState(null);
+  const [confirmId, setConfirmId] = useState(null);
 
   const handleSubmit = async (values) => {
     if (modal === 'create') await createTarifa(values);
@@ -99,10 +101,11 @@ export default function Configuracion() {
     setModal(null);
   };
 
-  const handleDelete = async (id) => {
-    if (!confirm('¿Eliminar esta tarifa? Los grupos que la usen perderán referencia.')) return;
-    setDeleting(id);
-    try { await deleteTarifa(id); } finally { setDeleting(null); }
+  const handleDeleteConfirm = async () => {
+    if (!confirmId) return;
+    setDeleting(confirmId);
+    setConfirmId(null);
+    try { await deleteTarifa(confirmId); } finally { setDeleting(null); }
   };
 
   const columns = [
@@ -114,7 +117,7 @@ export default function Configuracion() {
       header: '',
       cellClassName: 'text-right',
       render: (r) => (
-        <div className="flex gap-2 justify-end">
+        <div className="flex gap-1.5 justify-end">
           <Button size="icon" variant="ghost" onClick={() => setModal(r)} aria-label="Editar tarifa">
             <Pencil size={13} />
           </Button>
@@ -122,7 +125,7 @@ export default function Configuracion() {
             size="icon"
             variant="danger"
             loading={deleting === r.id}
-            onClick={() => handleDelete(r.id)}
+            onClick={() => setConfirmId(r.id)}
             aria-label="Eliminar tarifa"
           >
             <Trash2 size={13} />
@@ -135,21 +138,21 @@ export default function Configuracion() {
   return (
     <div className="space-y-8 animate-fade-in max-w-2xl">
       <div>
-        <h1 className="text-2xl font-semibold text-white">Configuración</h1>
+        <h1 className="text-2xl font-semibold text-zinc-900 dark:text-white">Configuración</h1>
         <p className="text-sm text-zinc-500 mt-1">Personaliza la app y gestiona tarifas</p>
       </div>
 
       {/* ── Apariencia ── */}
       <Card>
-        <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider mb-5">Apariencia</h2>
+        <h2 className="text-sm font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider mb-5">Apariencia</h2>
 
         <div className="space-y-6">
           {/* Dark / Light Mode */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              {mode === 'dark' ? <Moon size={18} className="text-zinc-400" /> : <Sun size={18} className="text-amber-400" />}
+              {mode === 'dark' ? <Moon size={18} className="text-zinc-400" /> : <Sun size={18} className="text-amber-500" />}
               <div>
-                <p className="text-sm font-medium text-white">Modo {mode === 'dark' ? 'oscuro' : 'claro'}</p>
+                <p className="text-sm font-medium text-zinc-900 dark:text-white">Modo {mode === 'dark' ? 'oscuro' : 'claro'}</p>
                 <p className="text-xs text-zinc-500">Fondo {mode === 'dark' ? '#000000' : '#FFFFFF'}</p>
               </div>
             </div>
@@ -162,7 +165,7 @@ export default function Configuracion() {
 
           {/* Color de acento */}
           <div>
-            <p className="text-sm font-medium text-white mb-1">Color de Acento</p>
+            <p className="text-sm font-medium text-zinc-900 dark:text-white mb-1">Color de Acento</p>
             <p className="text-xs text-zinc-500 mb-3">Afecta botones, bordes activos y gráficas</p>
             <ColorPicker />
           </div>
@@ -172,7 +175,7 @@ export default function Configuracion() {
       {/* ── Tarifas ── */}
       <Card>
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider">Tarifas</h2>
+          <h2 className="text-sm font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider">Tarifas</h2>
           <Button size="sm" onClick={() => setModal('create')} id="btn-crear-tarifa">
             <Plus size={14} /> Nueva tarifa
           </Button>
@@ -198,6 +201,17 @@ export default function Configuracion() {
           onCancel={() => setModal(null)}
         />
       </Modal>
+
+      {/* ConfirmDialog eliminar tarifa */}
+      <ConfirmDialog
+        open={!!confirmId}
+        title="Eliminar tarifa"
+        message="¿Eliminar esta tarifa? Los grupos que la usen perderán la referencia de precio."
+        confirmText="Eliminar"
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setConfirmId(null)}
+        destructive
+      />
     </div>
   );
 }

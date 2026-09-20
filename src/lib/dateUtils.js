@@ -56,3 +56,42 @@ export function nombrePeriodo(date) {
   return date.toLocaleDateString('es-MX', { month: 'long', year: 'numeric' })
     .replace(/^\w/, (c) => c.toUpperCase());
 }
+
+/** Calcula la fecha de la próxima clase esperada para un grupo. */
+export function calcularProximaClaseEsperada(grupo, clasesDelGrupo) {
+  const hoyStr = formatISO(new Date());
+  
+  // 1. Buscar en clases registradas
+  const clasesFuturas = clasesDelGrupo
+    .filter(c => c.fecha_clase >= hoyStr)
+    .sort((a, b) => a.fecha_clase.localeCompare(b.fecha_clase));
+  if (clasesFuturas.length > 0) return clasesFuturas[0].fecha_clase;
+
+  // 2. Si no hay clases futuras, iterar desde fecha_inicio
+  if (!grupo.fecha_inicio) return null;
+  const hoyTime = parseISO(hoyStr).getTime();
+  let current = parseISO(grupo.fecha_inicio);
+  
+  let endTime = null;
+  if (grupo.cantidad_lecciones > 0) {
+    const end = new Date(current);
+    end.setDate(end.getDate() + (grupo.cantidad_lecciones - 1) * 7);
+    endTime = end.getTime();
+  } else if (grupo.fecha_fin) {
+    endTime = parseISO(grupo.fecha_fin).getTime();
+  }
+
+  if (endTime !== null && endTime < hoyTime) {
+    return null; // El grupo ya finalizó
+  }
+
+  while (current.getTime() < hoyTime) {
+    current.setDate(current.getDate() + 7);
+  }
+  
+  if (endTime !== null && current.getTime() > endTime) {
+    return null;
+  }
+
+  return formatISO(current);
+}
