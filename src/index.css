@@ -1,0 +1,60 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Variables de acento por defecto (se sobrescriben via JS) ─── */
+:root {
+  --accent:       #3B82F6;
+  --accent-light: #93C5FD;
+  --accent-dark:  #1D4ED8;
+}
+
+/* ── Reset y base ─────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Fondo puro negro en dark, blanco en light */
+html.dark  { background-color: #000000; color-scheme: dark;  }
+html:not(.dark) { background-color: #ffffff; color-scheme: light; }
+
+body {
+  margin: 0;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* ── Scrollbar minimalista ────────────────────────────────────── */
+::-webkit-scrollbar        { width: 4px; height: 4px; }
+::-webkit-scrollbar-track  { background: transparent; }
+::-webkit-scrollbar-thumb  { background: rgba(255,255,255,0.15); border-radius: 9999px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.3); }
+
+/* ── Selección de texto con color acento ─────────────────────── */
+::selection { background-color: var(--accent); color: #fff; }
+
+/* ── Utilidades de opacidad de borde Tailwind (bg/border via CSS var) ─ */
+.border-white\/8  { border-color: rgba(255,255,255,0.08); }
+.border-white\/10 { border-color: rgba(255,255,255,0.10); }
+.bg-white\/3      { background-color: rgba(255,255,255,0.03); }
+.bg-white\/5      { background-color: rgba(255,255,255,0.05); }
+.bg-white\/10     { background-color: rgba(255,255,255,0.10); }
+.bg-white\/2      { background-color: rgba(255,255,255,0.02); }
+
+/* ── Clase safe-area para iOS ────────────────────────────────── */
+.safe-area-inset-bottom { padding-bottom: env(safe-area-inset-bottom, 8px); }
+
+/* ── Animaciones ─────────────────────────────────────────────── */
+@keyframes fadeIn    { from { opacity: 0 }                           to { opacity: 1 } }
+@keyframes slideUp   { from { opacity: 0; transform: translateY(8px) } to { opacity: 1; transform: none } }
+
+.animate-fade-in { animation: fadeIn  0.2s ease-out both; }
+.animate-slide-up { animation: slideUp 0.25s ease-out both; }
+
+/* ── Recharts overrides ──────────────────────────────────────── */
+.recharts-tooltip-wrapper { outline: none !important; }
