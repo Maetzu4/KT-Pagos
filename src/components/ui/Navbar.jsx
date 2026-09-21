@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Users, BookOpen, BarChart3, Settings } from 'lucide-react';
+import { LayoutDashboard, Users, BookOpen, BarChart3, Settings, LogOut } from 'lucide-react';
+import { supabase } from '../../lib/supabaseClient';
 import { useTheme } from '../../context/ThemeContext';
 import { cn } from '../../lib/utils';
 
@@ -21,9 +22,7 @@ export function Navbar() {
                       bg-white border-r border-zinc-200 dark:bg-zinc-950 dark:border-zinc-800 z-40 py-6 transition-all">
         {/* Logo */}
         <div className="px-4 mb-8 flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-[var(--accent-color)] flex items-center justify-center shrink-0 shadow-sm">
-            <span className="text-white font-bold text-sm">KT</span>
-          </div>
+          <img src="/favicon.svg" alt="KT-Pagos Logo" className="w-9 h-9 rounded-xl shadow-sm hover:opacity-90 transition-opacity" />
           <span className="hidden lg:block text-zinc-900 dark:text-white font-semibold text-sm">KT-Pagos</span>
         </div>
 
@@ -46,6 +45,21 @@ export function Navbar() {
               <span className="hidden lg:block">{label}</span>
             </NavLink>
           ))}
+        </div>
+
+        {/* Botón Logout (Desktop) */}
+        <div className="mt-auto px-2">
+          <button
+            onClick={() => supabase.auth.signOut()}
+            className={cn(
+              'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-zinc-600 dark:text-zinc-400',
+              'hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30 dark:hover:text-red-400',
+              'transition-all duration-200 ease-in-out group relative'
+            )}
+          >
+            <LogOut size={18} className="shrink-0 transition-transform duration-200 group-hover:scale-110" />
+            <span className="hidden lg:block font-medium">Cerrar Sesión</span>
+          </button>
         </div>
       </nav>
 
@@ -70,6 +84,19 @@ export function Navbar() {
             <span>{label}</span>
           </NavLink>
         ))}
+
+        {/* Botón Logout (Mobile) */}
+        <button
+          onClick={() => supabase.auth.signOut()}
+          className={cn(
+            'flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl text-xs text-zinc-600 dark:text-zinc-400',
+            'hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30 dark:hover:text-red-400',
+            'transition-all duration-200 ease-in-out'
+          )}
+        >
+          <LogOut size={20} className="transition-transform duration-200" />
+          <span>Salir</span>
+        </button>
       </nav>
     </>
   );
