@@ -31,7 +31,7 @@ export function useClases(filtros = {}) {
    * Requiere que getOrCreatePeriodo sea pasado desde usePeriodos.
    */
   const createClase = async (values, getOrCreatePeriodo) => {
-    const { grupo_id, fecha_clase, es_extra, ...rest } = values;
+    const { grupo_id, fecha_clase, es_extra, recalc, ...rest } = values;
 
     // 1. Obtener tarifa del grupo
     const { data: grupo, error: gErr } = await supabase
