@@ -4,31 +4,37 @@ import { supabase } from '../lib/supabaseClient';
 import { FormField, Input } from '../components/ui/FormField';
 import { Button } from '../components/ui/Button';
 
-export default function Login() {
+export default function Registro() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
-  const handleLogin = async (e) => {
+  const handleRegister = async (e) => {
     e.preventDefault();
     setError('');
 
-    if (!email || !password) {
-      setError('Por favor, ingresa tu correo y contraseña.');
+    if (!email || !password || !confirmPassword) {
+      setError('Por favor, completa todos los campos.');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError('Las contraseñas no coinciden.');
       return;
     }
 
     setLoading(true);
-    const { error: signInError } = await supabase.auth.signInWithPassword({
+    const { error: signUpError } = await supabase.auth.signUp({
       email,
       password,
     });
     setLoading(false);
 
-    if (signInError) {
-      setError('Credenciales incorrectas o error al iniciar sesión.');
+    if (signUpError) {
+      setError(signUpError.message || 'Error al registrar el usuario.');
     } else {
       navigate('/', { replace: true });
     }
@@ -39,11 +45,11 @@ export default function Login() {
       <div className="w-full max-w-sm bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-xl p-6 sm:p-8">
         <div className="text-center mb-8">
           <img src="/favicon.svg" alt="KT-Pagos Logo" className="w-16 h-16 mx-auto rounded-2xl shadow-md mb-2" />
-          <h1 className="text-xl font-semibold text-zinc-900 dark:text-white">Bienvenido a KT-Pagos</h1>
-          <p className="text-sm text-zinc-500 mt-1">Inicia sesión para gestionar tus tutorías</p>
+          <h1 className="text-xl font-semibold text-zinc-900 dark:text-white">Crear cuenta</h1>
+          <p className="text-sm text-zinc-500 mt-1">Regístrate en KT-Pagos</p>
         </div>
 
-        <form onSubmit={handleLogin} className="space-y-4">
+        <form onSubmit={handleRegister} className="space-y-4">
           <FormField label="Correo Electrónico">
             <Input
               type="email"
@@ -62,18 +68,27 @@ export default function Login() {
               required
             />
           </FormField>
+          <FormField label="Confirmar Contraseña">
+            <Input
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="••••••••"
+              required
+            />
+          </FormField>
 
           {error && <p className="text-sm text-red-500 dark:text-red-400 text-center">{error}</p>}
 
           <Button type="submit" className="w-full mt-2" loading={loading}>
-            Iniciar Sesión
+            Registrarse
           </Button>
         </form>
 
         <p className="text-center text-sm text-zinc-500 mt-6">
-          ¿No tienes cuenta?{' '}
-          <Link to="/registro" className="text-[var(--accent-color)] hover:underline">
-            Regístrate
+          ¿Ya tienes cuenta?{' '}
+          <Link to="/login" className="text-[var(--accent-color)] hover:underline">
+            Inicia sesión
           </Link>
         </p>
       </div>

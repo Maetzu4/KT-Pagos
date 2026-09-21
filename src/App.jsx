@@ -9,6 +9,7 @@ import Clases        from './pages/Clases';
 import Finanzas      from './pages/Finanzas';
 import Configuracion from './pages/Configuracion';
 import Login         from './pages/Login';
+import Registro      from './pages/Registro';
 
 function Layout({ children }) {
   return (
@@ -63,6 +64,7 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/registro" element={<Registro />} />
           <Route
             path="/*"
             element={
