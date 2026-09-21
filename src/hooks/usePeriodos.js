@@ -12,7 +12,7 @@ export function usePeriodos() {
     setError(null);
     const { data, error: err } = await supabase
       .from('periodos')
-      .select(`*, clases(id, nombre_clase, fecha_clase, precio_cobrado, en_reclamo)`)
+      .select(`*, clases(*, grupos(id, nombre_grupo))`)
       .order('fecha_inicio', { ascending: false });
     if (err) { setError(err.message); setLoading(false); return; }
 

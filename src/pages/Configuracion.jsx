@@ -111,6 +111,11 @@ export default function Configuracion() {
     try { await deleteTarifa(confirmId); } finally { setDeleting(null); }
   };
 
+  const copiarCorreo = () => {
+    navigator.clipboard.writeText('6814natsu@gmail.com');
+    alert('¡Correo copiado al portapapeles!');
+  };
+
   const columns = [
     { key: 'duracion_minutos', header: 'Duración', render: (r) => `${r.duracion_minutos} min` },
     { key: 'precio_regular',   header: 'Precio Regular', render: (r) => formatCurrency(r.precio_regular) },
@@ -201,7 +206,7 @@ export default function Configuracion() {
         </div>
         <button
           onClick={() => setIsDonationModalOpen(true)}
-          className="w-full text-center text-sm font-medium text-[var(--accent-color)] hover:bg-[var(--accent-color)]/10 py-2 rounded-lg transition-colors border border-[var(--accent-color)]/20"
+          className="w-full py-3 px-4 bg-zinc-800/40 hover:bg-zinc-800 text-[var(--accent-color)] border-none rounded-lg transition-colors font-medium text-sm text-center"
         >
           ¿Quieres apoyar este proyecto? Haz clic aquí ☕
         </button>
@@ -212,16 +217,26 @@ export default function Configuracion() {
           <div>
             Si eres de Colombia, puedes apoyar este proyecto por <strong>BRE-B</strong>. Mi llave es:
             <br />
-            <span className="bg-zinc-100 dark:bg-zinc-800/50 px-3 py-1.5 rounded-md text-sm mt-2 inline-block w-fit font-mono text-[var(--accent-color)]">
-              6814natsu@gmail.com
-            </span>
+            <div className="flex items-center gap-2 mt-2">
+              <span className="bg-zinc-100 dark:bg-zinc-800/50 px-3 py-1.5 rounded-md text-sm font-mono text-[var(--accent-color)]">
+                6814natsu@gmail.com
+              </span>
+              <Button size="sm" variant="ghost" onClick={copiarCorreo}>
+                Copiar
+              </Button>
+            </div>
           </div>
           <div>
             Si eres de otro país también puedes apoyar por <strong>PayPal</strong>:
             <br />
-            <span className="bg-zinc-100 dark:bg-zinc-800/50 px-3 py-1.5 rounded-md text-sm mt-2 inline-block w-fit font-mono text-[var(--accent-color)]">
-              6814natsu@gmail.com
-            </span>
+            <div className="flex items-center gap-2 mt-2">
+              <span className="bg-zinc-100 dark:bg-zinc-800/50 px-3 py-1.5 rounded-md text-sm font-mono text-[var(--accent-color)]">
+                6814natsu@gmail.com
+              </span>
+              <Button size="sm" variant="ghost" onClick={copiarCorreo}>
+                Copiar
+              </Button>
+            </div>
           </div>
           <p className="font-medium text-zinc-900 dark:text-zinc-300 pt-2 border-t border-zinc-200 dark:border-zinc-800/50">
             ¡Gracias por tu apoyo para mantener este proyecto de código abierto!
