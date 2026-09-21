@@ -16,8 +16,8 @@ import { formatDate } from '../lib/dateUtils';
 
 // ── Fila de periodo en tabla ──────────────────────────────────────────────────
 function PeriodoRow({ periodo, onClick }) {
-  const totalACobrar  = periodo.total_a_cobrar ?? periodo.estimado_real;
-  const errorPago     = (periodo.pagado_real || 0) - totalACobrar;
+  const totalACobrar = periodo.total_a_cobrar ?? periodo.estimado_real;
+  const errorPago = (periodo.pagado_real || 0) - totalACobrar;
   const errorPositivo = errorPago >= 0;
 
   return (
@@ -90,14 +90,14 @@ export default function Finanzas() {
   const { periodos, loading, updatePeriodo } = usePeriodos();
 
   const [selectedPeriodo, setSelectedPeriodo] = useState(null);
-  const [search,          setSearch]          = useState('');
-  const [filtroAnio,      setFiltroAnio]      = useState('');
-  const [filtroMes,       setFiltroMes]       = useState('');
+  const [search, setSearch] = useState('');
+  const [filtroAnio, setFiltroAnio] = useState('');
+  const [filtroMes, setFiltroMes] = useState('');
 
   // Totales globales
   const totalEstimado = periodos.reduce((s, p) => s + (p.total_a_cobrar ?? p.estimado_real ?? 0), 0);
-  const totalPagado   = periodos.reduce((s, p) => s + (p.pagado_real ?? 0), 0);
-  const totalDeuda    = periodos.reduce((s, p) => s + (p.deuda_reclamos ?? 0), 0);
+  const totalPagado = periodos.reduce((s, p) => s + (p.pagado_real ?? 0), 0);
+  const totalDeuda = periodos.reduce((s, p) => s + (p.deuda_reclamos ?? 0), 0);
   const totalRollover = periodos.reduce((s, p) => s + (p.deuda_anterior ?? 0), 0);
 
   // ── Opciones de filtros Año y Mes ─────────────────────────────────
@@ -111,12 +111,12 @@ export default function Finanzas() {
 
   const MESES = [
     { value: '', label: 'Todos los meses' },
-    { value: '01', label: 'Enero'  }, { value: '02', label: 'Febrero' },
-    { value: '03', label: 'Marzo'  }, { value: '04', label: 'Abril'   },
-    { value: '05', label: 'Mayo'   }, { value: '06', label: 'Junio'   },
-    { value: '07', label: 'Julio'  }, { value: '08', label: 'Agosto'  },
-    { value: '09', label: 'Septiembre' }, { value: '10', label: 'Octubre'  },
-    { value: '11', label: 'Noviembre'  }, { value: '12', label: 'Diciembre' },
+    { value: '01', label: 'Enero' }, { value: '02', label: 'Febrero' },
+    { value: '03', label: 'Marzo' }, { value: '04', label: 'Abril' },
+    { value: '05', label: 'Mayo' }, { value: '06', label: 'Junio' },
+    { value: '07', label: 'Julio' }, { value: '08', label: 'Agosto' },
+    { value: '09', label: 'Septiembre' }, { value: '10', label: 'Octubre' },
+    { value: '11', label: 'Noviembre' }, { value: '12', label: 'Diciembre' },
   ];
 
   // ── Filtrado combinado ────────────────────────────────────────────
@@ -130,10 +130,10 @@ export default function Finanzas() {
       // Filtro por texto / número
       if (q) {
         const totalACobrar = String(p.total_a_cobrar ?? p.estimado_real ?? '');
-        const pagado       = String(p.pagado_real ?? '');
-        const deuda        = String(p.deuda_reclamos ?? '');
-        const notas        = (p.notas_reclamo ?? '').toLowerCase();
-        const nombre       = (p.nombre_periodo ?? '').toLowerCase();
+        const pagado = String(p.pagado_real ?? '');
+        const deuda = String(p.deuda_reclamos ?? '');
+        const notas = (p.notas_reclamo ?? '').toLowerCase();
+        const nombre = (p.nombre_periodo ?? '').toLowerCase();
         return (
           totalACobrar.includes(q) ||
           pagado.includes(q) ||
@@ -158,7 +158,7 @@ export default function Finanzas() {
       {/* ── Totales globales — MetricCards uniformes ── */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <MetricCard
-          label="Total a Cobrar"
+          label="Total Estimado"
           value={formatCurrency(totalEstimado)}
           icon={TrendingUp}
         />
@@ -168,12 +168,12 @@ export default function Finanzas() {
           icon={DollarSign}
         />
         <MetricCard
-          label="Deuda Reclamos"
+          label="Total Reclamos"
           value={formatCurrency(totalDeuda)}
           icon={AlertTriangle}
         />
         <MetricCard
-          label="Deuda Arrastrada"
+          label="Total Arrastrado"
           value={formatCurrency(totalRollover)}
           icon={RotateCcw}
         />
@@ -240,9 +240,9 @@ export default function Finanzas() {
           {hayFiltros
             ? <p>Sin periodos que coincidan con los filtros.</p>
             : <>
-                <p>No hay periodos registrados aún.</p>
-                <p className="text-sm mt-1">Se crean automáticamente al registrar clases.</p>
-              </>
+              <p>No hay periodos registrados aún.</p>
+              <p className="text-sm mt-1">Se crean automáticamente al registrar clases.</p>
+            </>
           }
         </div>
       ) : (
