@@ -16,9 +16,9 @@ import { formatCurrency } from '../lib/utils';
 const DEFAULT_TARIFA = { duracion_minutos: '', precio_regular: '', precio_extra: '' };
 
 function TarifaForm({ initial, onSubmit, onCancel }) {
-  const [form,   setForm]   = useState({ ...DEFAULT_TARIFA, ...initial });
+  const [form, setForm] = useState({ ...DEFAULT_TARIFA, ...initial });
   const [saving, setSaving] = useState(false);
-  const [error,  setError]  = useState('');
+  const [error, setError] = useState('');
 
   const set = (k) => (e) => setForm((p) => ({ ...p, [k]: e.target.value }));
 
@@ -33,8 +33,8 @@ function TarifaForm({ initial, onSubmit, onCancel }) {
     try {
       await onSubmit({
         duracion_minutos: Number(form.duracion_minutos),
-        precio_regular:   parseFloat(form.precio_regular),
-        precio_extra:     parseFloat(form.precio_extra),
+        precio_regular: parseFloat(form.precio_regular),
+        precio_extra: parseFloat(form.precio_extra),
       });
     } catch (err) {
       setError(err.message);
@@ -92,7 +92,7 @@ export default function Configuracion() {
   const { mode, toggleMode } = useTheme();
   const { tarifas, loading, createTarifa, updateTarifa, deleteTarifa } = useTarifas();
 
-  const [modal,    setModal]    = useState(null); // null | 'create' | tarifa
+  const [modal, setModal] = useState(null); // null | 'create' | tarifa
   const [deleting, setDeleting] = useState(null);
   const [confirmId, setConfirmId] = useState(null);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -118,8 +118,8 @@ export default function Configuracion() {
 
   const columns = [
     { key: 'duracion_minutos', header: 'Duración', render: (r) => `${r.duracion_minutos} min` },
-    { key: 'precio_regular',   header: 'Precio Regular', render: (r) => formatCurrency(r.precio_regular) },
-    { key: 'precio_extra',     header: 'Precio Extra',   render: (r) => formatCurrency(r.precio_extra) },
+    { key: 'precio_regular', header: 'Precio Regular', render: (r) => formatCurrency(r.precio_regular) },
+    { key: 'precio_extra', header: 'Precio Extra', render: (r) => formatCurrency(r.precio_extra) },
     {
       key: 'actions',
       header: '',
@@ -201,7 +201,7 @@ export default function Configuracion() {
         <div className="flex items-center gap-2 mb-4 select-none">
           <Heart size={18} className="text-[var(--accent-color)] fill-[var(--accent-color)]" />
           <h2 className="text-sm font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider">
-            Hecho con amor por NATHAN OLMOS
+            Hecho con amor por <a className="text-[var(--accent-color)] hover:underline" href="https://github.com/Maetzu4" target="_blank" rel="noopener noreferrer">NATHAN OLMOS</a> del Team 4
           </h2>
         </div>
         <button
@@ -215,7 +215,7 @@ export default function Configuracion() {
       <Modal open={isDonationModalOpen} onClose={() => setIsDonationModalOpen(false)} title="Apoyar el proyecto">
         <div className="space-y-4 text-sm text-zinc-600 dark:text-zinc-400">
           <div>
-            Si eres de Colombia, puedes apoyar este proyecto por <strong>BRE-B</strong>. Mi llave es:
+            Si eres de Colombia, puedes apoyar este proyecto por <strong>BRE-B</strong>:
             <br />
             <div className="flex items-center gap-2 mt-2">
               <span className="bg-zinc-100 dark:bg-zinc-800/50 px-3 py-1.5 rounded-md text-sm font-mono text-[var(--accent-color)]">
