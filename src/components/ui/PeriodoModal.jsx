@@ -4,7 +4,6 @@ import { Button } from './Button';
 import { Modal } from './Modal';
 import { FormField, Input, Textarea } from './FormField';
 import { formatCurrency } from '../../lib/utils';
-import { formatCurrency } from '../../lib/utils';
 import { formatDate } from '../../lib/dateUtils';
 import { ClaseDetailModal } from './ClaseDetailModal';
 
