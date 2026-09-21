@@ -38,6 +38,7 @@ export function ClaseForm({ initial, initialGroupId, grupos = [], onSubmit, onCa
   const [grupoSearch, setGrupoSearch] = useState(() => {
     return grupos.find(g => String(g.id) === String(form.grupo_id))?.nombre_grupo || '';
   });
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   // Guardar referencia de los valores originales para detectar cambios
   const originalGrupoId = initial?.grupo_id != null ? String(initial.grupo_id) : '';
@@ -114,24 +115,46 @@ export function ClaseForm({ initial, initialGroupId, grupos = [], onSubmit, onCa
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <FormField label="Grupo" required className="md:col-span-2">
-          <Input
-            id="grupo_id_search"
-            list="grupos-list"
-            value={grupoSearch}
-            onChange={(e) => {
-              const val = e.target.value;
-              setGrupoSearch(val);
-              const matched = grupos.find(g => g.nombre_grupo === val);
-              setForm(p => ({ ...p, grupo_id: matched ? String(matched.id) : '' }));
-            }}
-            placeholder="Escribe para buscar grupo…"
-            autoComplete="off"
-          />
-          <datalist id="grupos-list">
-            {grupos.map(g => (
-              <option key={g.id} value={g.nombre_grupo} />
-            ))}
-          </datalist>
+          <div className="relative">
+            <Input
+              id="grupo_id_search"
+              value={grupoSearch}
+              onFocus={() => setIsDropdownOpen(true)}
+              onBlur={() => setTimeout(() => setIsDropdownOpen(false), 200)}
+              onChange={(e) => {
+                const val = e.target.value;
+                setGrupoSearch(val);
+                setIsDropdownOpen(true);
+                const matched = grupos.find(g => g.nombre_grupo.toLowerCase() === val.toLowerCase());
+                setForm(p => ({ ...p, grupo_id: matched ? String(matched.id) : '' }));
+              }}
+              placeholder="Escribe para buscar grupo…"
+              autoComplete="off"
+            />
+            {isDropdownOpen && (
+              <div className="absolute z-50 w-full mt-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+                {grupos.filter(g => g.nombre_grupo.toLowerCase().includes(grupoSearch.toLowerCase())).length > 0 ? (
+                  grupos
+                    .filter(g => g.nombre_grupo.toLowerCase().includes(grupoSearch.toLowerCase()))
+                    .map(g => (
+                      <div
+                        key={g.id}
+                        onClick={() => {
+                          setGrupoSearch(g.nombre_grupo);
+                          setForm(p => ({ ...p, grupo_id: String(g.id) }));
+                          setIsDropdownOpen(false);
+                        }}
+                        className="px-4 py-2 text-sm text-zinc-900 dark:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer transition-colors"
+                      >
+                        {g.nombre_grupo}
+                      </div>
+                    ))
+                ) : (
+                  <div className="px-4 py-2 text-sm text-zinc-500 text-center">Sin resultados</div>
+                )}
+              </div>
+            )}
+          </div>
         </FormField>
 
         <FormField label="Fecha de Clase" required>

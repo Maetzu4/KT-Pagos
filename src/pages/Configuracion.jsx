@@ -193,19 +193,25 @@ export default function Configuracion() {
       {/* ── Hecho con amor ── */}
       <Card>
         <div className="flex items-center gap-2 mb-4">
-          <Heart size={18} className="text-red-500 fill-red-500" />
+          <Heart size={18} className="text-[var(--accent-color)] fill-[var(--accent-color)]" />
           <h2 className="text-sm font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider">
-            Hecho con amor por <a href="https://github.com/maetzu4" target="_blank" rel="noopener noreferrer" className="text-[var(--accent-color)] hover:underline">Natan Olmos</a>
+            Hecho con amor por <a href="https://github.com/maetzu4" target="_blank" rel="noopener noreferrer" className="text-[var(--accent-color)] hover:underline">NATHAN OLMOS</a>
           </h2>
         </div>
-        <div className="space-y-3 text-sm text-zinc-600 dark:text-zinc-400">
-          <p>
-            Si eres de Colombia, puedes apoyar este proyecto por <strong>Breve</strong>. Mi llave es: <span className="font-mono bg-zinc-100 dark:bg-zinc-800 px-1 py-0.5 rounded text-[var(--accent-color)]">6814natsu@gmail.com</span>
-          </p>
-          <p>
-            Si eres del extranjero, puedes apoyarme vía <strong>PayPal</strong> a: <span className="font-mono bg-zinc-100 dark:bg-zinc-800 px-1 py-0.5 rounded text-[var(--accent-color)]">6814natsu@gmail.com</span>
-          </p>
-          <p className="font-medium text-zinc-900 dark:text-zinc-300 mt-2">
+        <div className="space-y-4 text-sm text-zinc-600 dark:text-zinc-400">
+          <div>
+            Si eres de Colombia, puedes apoyar este proyecto por <strong>Nequi</strong>. Mi llave es:
+            <span className="bg-zinc-100 dark:bg-zinc-800/50 px-3 py-1.5 rounded-md text-sm mt-2 inline-block w-fit font-mono text-[var(--accent-color)]">
+              6814natsu@gmail.com
+            </span>
+          </div>
+          <div>
+            Si eres de otro país, puedes apoyar por <strong>PayPal</strong> a:
+            <span className="bg-zinc-100 dark:bg-zinc-800/50 px-3 py-1.5 rounded-md text-sm mt-2 inline-block w-fit font-mono text-[var(--accent-color)]">
+              6814natsu@gmail.com
+            </span>
+          </div>
+          <p className="font-medium text-zinc-900 dark:text-zinc-300 pt-2 border-t border-zinc-200 dark:border-zinc-800/50">
             ¡Gracias por tu apoyo para mantener este proyecto de código abierto!
           </p>
         </div>
