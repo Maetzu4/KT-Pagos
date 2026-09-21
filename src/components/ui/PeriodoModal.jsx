@@ -128,8 +128,9 @@ export function PeriodoModal({ periodo, open, onClose, onUpdate }) {
           </div>
         </div>
       ) : (
-      {/* Scroll interior del modal */}
-      <div className="overflow-y-auto max-h-[70vh] space-y-7 pr-1">
+        <>
+          {/* Scroll interior del modal */}
+          <div className="overflow-y-auto max-h-[70vh] space-y-7 pr-1">
 
         {/* Resumen de métricas */}
         <div className="grid grid-cols-3 gap-3 text-center">
@@ -227,6 +228,7 @@ export function PeriodoModal({ periodo, open, onClose, onUpdate }) {
           <Save size={14} /> Guardar periodo
         </Button>
       </div>
+        </>
       )}
     </Modal>
   );
