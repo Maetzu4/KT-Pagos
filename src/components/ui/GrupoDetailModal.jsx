@@ -6,7 +6,7 @@ import { formatDate, parseISO, addDays, formatISO, calcularProximaClaseEsperada 
 import { formatCurrency } from '../../lib/utils';
 import { useClases } from '../../hooks/useClases';
 
-export function GrupoDetailModal({ grupo, open, onClose, onEdit }) {
+export function GrupoDetailModal({ grupo, open, onClose, onEdit, readOnly = false }) {
   const { clases } = useClases(grupo ? { grupo_id: grupo.id } : {});
   if (!grupo) return null;
 
@@ -102,11 +102,13 @@ export function GrupoDetailModal({ grupo, open, onClose, onEdit }) {
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end pt-2 border-t border-zinc-200 dark:border-zinc-800">
-          <Button size="sm" variant="ghost" onClick={() => { onClose(); onEdit?.(grupo); }}>
-            <Pencil size={13} /> Editar grupo
-          </Button>
-        </div>
+        {!readOnly && (
+          <div className="flex justify-end pt-2 border-t border-zinc-200 dark:border-zinc-800">
+            <Button size="sm" variant="ghost" onClick={() => { onClose(); onEdit?.(grupo); }}>
+              <Pencil size={13} /> Editar grupo
+            </Button>
+          </div>
+        )}
       </div>
     </Modal>
   );

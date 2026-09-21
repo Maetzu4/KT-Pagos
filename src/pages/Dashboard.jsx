@@ -352,6 +352,7 @@ export default function Dashboard() {
         grupo={detalle}
         open={!!detalle}
         onClose={() => setDetalle(null)}
+        readOnly={true}
       />
 
       <PeriodoModal
