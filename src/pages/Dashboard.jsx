@@ -10,6 +10,7 @@ import { Badge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
 import { GrupoDetailModal } from '../components/ui/GrupoDetailModal';
 import { PeriodoModal } from '../components/ui/PeriodoModal';
+import { ClaseDetailModal } from '../components/ui/ClaseDetailModal';
 import { ClaseForm } from '../components/forms/ClaseForm';
 import { useGrupos } from '../hooks/useGrupos';
 import { usePeriodos } from '../hooks/usePeriodos';
@@ -61,7 +62,11 @@ function ChartPeriodoModal({ data, onClose }) {
           <p className="text-zinc-500 text-sm italic">No hay clases en este periodo.</p>
         ) : (
           clases.sort((a, b) => b.fecha_clase.localeCompare(a.fecha_clase)).map((c) => (
-            <div key={c.id} className="flex justify-between items-center text-sm p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/40">
+            <div 
+              key={c.id} 
+              className="flex justify-between items-center text-sm p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/40 cursor-pointer hover:border-[var(--accent-color)]/50 transition-colors"
+              onClick={() => onClose(c)}
+            >
               <div>
                 <p className="font-semibold text-zinc-900 dark:text-white truncate max-w-[200px]">{c.nombre_clase || 'Sin nombre'}</p>
                 <p className="text-xs text-zinc-500 mt-0.5">{formatDate(c.fecha_clase)} — {c.grupos?.nombre_grupo ?? 'Sin grupo'}</p>
@@ -91,6 +96,7 @@ export default function Dashboard() {
   const [detalle, setDetalle] = useState(null);
   const [chartDetalle, setChartDetalle] = useState(null);
   const [selectedPeriodo, setSelectedPeriodo] = useState(null);
+  const [claseDetalle, setClaseDetalle] = useState(null);
   const [chartPeriodos, setChartPeriodos] = useState(8); // periodos visibles en la gráfica
 
   // ── Métricas ─────────────────────────────────────────────────────
@@ -329,6 +335,7 @@ export default function Dashboard() {
             data={clasesRecientes}
             loading={loadingClasesRecientes}
             emptyMessage="Sin clases registradas en el periodo actual"
+            onRowClick={(c) => setClaseDetalle(c)}
           />
         </section>
       )}
@@ -367,7 +374,18 @@ export default function Dashboard() {
 
       <ChartPeriodoModal 
         data={chartDetalle}
-        onClose={() => setChartDetalle(null)}
+        onClose={(c) => {
+          setChartDetalle(null);
+          if (c && c.id) {
+            setClaseDetalle(c);
+          }
+        }}
+      />
+
+      <ClaseDetailModal 
+        isOpen={!!claseDetalle} 
+        onClose={() => setClaseDetalle(null)} 
+        clase={claseDetalle} 
       />
     </div>
   );

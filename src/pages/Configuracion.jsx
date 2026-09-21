@@ -96,7 +96,7 @@ export default function Configuracion() {
   const [deleting, setDeleting] = useState(null);
   const [confirmId, setConfirmId] = useState(null);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-  const [showDonations, setShowDonations] = useState(false);
+  const [isDonationModalOpen, setIsDonationModalOpen] = useState(false);
 
   const handleSubmit = async (values) => {
     if (modal === 'create') await createTarifa(values);
@@ -193,37 +193,41 @@ export default function Configuracion() {
 
       {/* ── Hecho con amor ── */}
       <Card>
-        <div 
-          className="flex items-center gap-2 mb-4 cursor-pointer select-none"
-          onClick={() => setShowDonations(!showDonations)}
-        >
+        <div className="flex items-center gap-2 mb-4 select-none">
           <Heart size={18} className="text-[var(--accent-color)] fill-[var(--accent-color)]" />
           <h2 className="text-sm font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider">
-            Hecho con amor por <a href="https://github.com/maetzu4" target="_blank" rel="noopener noreferrer" className="text-[var(--accent-color)] hover:underline" onClick={(e) => e.stopPropagation()}>NATHAN OLMOS</a>
+            Hecho con amor por NATHAN OLMOS
           </h2>
         </div>
-        {showDonations && (
-          <div className="space-y-4 text-sm text-zinc-600 dark:text-zinc-400">
-            <div>
-              Si eres de Colombia, puedes apoyar este proyecto por <strong>BRE-B</strong>. Mi llave es:
-              <br />
-              <span className="bg-zinc-100 dark:bg-zinc-800/50 px-3 py-1.5 rounded-md text-sm mt-2 inline-block w-fit font-mono text-[var(--accent-color)]">
-                6814natsu@gmail.com
-              </span>
-            </div>
-            <div>
-              Si eres de otro país también puedes apoyar por <strong>PayPal</strong>:
-              <br />
-              <span className="bg-zinc-100 dark:bg-zinc-800/50 px-3 py-1.5 rounded-md text-sm mt-2 inline-block w-fit font-mono text-[var(--accent-color)]">
-                6814natsu@gmail.com
-              </span>
-            </div>
-            <p className="font-medium text-zinc-900 dark:text-zinc-300 pt-2 border-t border-zinc-200 dark:border-zinc-800/50">
-              ¡Gracias por tu apoyo para mantener este proyecto de código abierto!
-            </p>
-          </div>
-        )}
+        <button
+          onClick={() => setIsDonationModalOpen(true)}
+          className="w-full text-center text-sm font-medium text-[var(--accent-color)] hover:bg-[var(--accent-color)]/10 py-2 rounded-lg transition-colors border border-[var(--accent-color)]/20"
+        >
+          ¿Quieres apoyar este proyecto? Haz clic aquí ☕
+        </button>
       </Card>
+
+      <Modal open={isDonationModalOpen} onClose={() => setIsDonationModalOpen(false)} title="Apoyar el proyecto">
+        <div className="space-y-4 text-sm text-zinc-600 dark:text-zinc-400">
+          <div>
+            Si eres de Colombia, puedes apoyar este proyecto por <strong>BRE-B</strong>. Mi llave es:
+            <br />
+            <span className="bg-zinc-100 dark:bg-zinc-800/50 px-3 py-1.5 rounded-md text-sm mt-2 inline-block w-fit font-mono text-[var(--accent-color)]">
+              6814natsu@gmail.com
+            </span>
+          </div>
+          <div>
+            Si eres de otro país también puedes apoyar por <strong>PayPal</strong>:
+            <br />
+            <span className="bg-zinc-100 dark:bg-zinc-800/50 px-3 py-1.5 rounded-md text-sm mt-2 inline-block w-fit font-mono text-[var(--accent-color)]">
+              6814natsu@gmail.com
+            </span>
+          </div>
+          <p className="font-medium text-zinc-900 dark:text-zinc-300 pt-2 border-t border-zinc-200 dark:border-zinc-800/50">
+            ¡Gracias por tu apoyo para mantener este proyecto de código abierto!
+          </p>
+        </div>
+      </Modal>
 
       {/* ── Logout (Mobile Alternative) ── */}
       <div className="md:hidden pt-4 pb-8">

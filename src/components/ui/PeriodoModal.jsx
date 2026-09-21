@@ -1,10 +1,12 @@
 import { useState, useMemo } from 'react';
-import { AlertTriangle, Save, TrendingDown, TrendingUp, CheckCircle2, RotateCcw, ArrowLeft, ExternalLink } from 'lucide-react';
+import { AlertTriangle, Save, CheckCircle2, RotateCcw } from 'lucide-react';
 import { Button } from './Button';
 import { Modal } from './Modal';
 import { FormField, Input, Textarea } from './FormField';
 import { formatCurrency } from '../../lib/utils';
+import { formatCurrency } from '../../lib/utils';
 import { formatDate } from '../../lib/dateUtils';
+import { ClaseDetailModal } from './ClaseDetailModal';
 
 // ── Sub-componente: Desglose del Rollover ────────────────────────────────────
 export function RolloverDesglose({ periodo }) {
@@ -82,53 +84,8 @@ export function PeriodoModal({ periodo, open, onClose, onUpdate }) {
   };
 
   return (
-    <Modal open={open} onClose={() => { setClaseDetalle(null); onClose(); }} title={claseDetalle ? 'Detalle de Clase' : periodo.nombre_periodo} size="md">
-      {claseDetalle ? (
-        <div className="space-y-6">
-          <div className="flex items-center gap-2 mb-2">
-            <Button size="sm" variant="ghost" onClick={() => setClaseDetalle(null)} className="-ml-2">
-              <ArrowLeft size={16} /> Volver
-            </Button>
-          </div>
-          <div className="space-y-4">
-            <div>
-              <p className="text-[10px] text-zinc-500 uppercase tracking-wide mb-1">Nombre / Tema</p>
-              <p className="text-sm font-medium text-zinc-900 dark:text-white">{claseDetalle.nombre_clase || '—'}</p>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-[10px] text-zinc-500 uppercase tracking-wide mb-1">Fecha</p>
-                <p className="text-sm text-zinc-900 dark:text-zinc-100">{formatDate(claseDetalle.fecha_clase)}</p>
-              </div>
-              <div>
-                <p className="text-[10px] text-zinc-500 uppercase tracking-wide mb-1">Monto Cobrado</p>
-                <p className="text-sm font-mono text-[var(--accent-color)]">{formatCurrency(claseDetalle.precio_cobrado)}</p>
-              </div>
-              <div>
-                <p className="text-[10px] text-zinc-500 uppercase tracking-wide mb-1">Grupo</p>
-                <p className="text-sm text-zinc-900 dark:text-zinc-100">{claseDetalle.grupos?.nombre_grupo || '—'}</p>
-              </div>
-              <div>
-                <p className="text-[10px] text-zinc-500 uppercase tracking-wide mb-1">Estado</p>
-                <p className="text-sm text-[var(--accent-color)] font-medium flex items-center gap-1">
-                  <AlertTriangle size={13} /> En Reclamo
-                </p>
-              </div>
-            </div>
-            {claseDetalle.link_grabacion && (
-              <div>
-                <p className="text-[10px] text-zinc-500 uppercase tracking-wide mb-2">Grabación</p>
-                <a href={claseDetalle.link_grabacion} target="_blank" rel="noopener noreferrer">
-                  <Button size="sm" variant="ghost" className="w-full justify-start">
-                    <ExternalLink size={14} className="mr-2" /> Ver grabación
-                  </Button>
-                </a>
-              </div>
-            )}
-          </div>
-        </div>
-      ) : (
-        <>
+    <>
+    <Modal open={open} onClose={() => { setClaseDetalle(null); onClose(); }} title={periodo.nombre_periodo} size="md">
           {/* Scroll interior del modal */}
           <div className="overflow-y-auto max-h-[70vh] space-y-7 pr-1">
 
@@ -139,18 +96,13 @@ export function PeriodoModal({ periodo, open, onClose, onUpdate }) {
             { l: 'Pagado', v: formatCurrency(periodo.pagado_real), c: 'text-[var(--accent-color)]' },
             {
               l: 'Diferencia',
-              v: (errorPositivo ? '+' : '') + formatCurrency(errorPago),
+              v: formatCurrency(errorPago),
               c: errorPositivo ? 'text-zinc-900 dark:text-white' : 'text-[var(--accent-color)]',
             },
           ].map(({ l, v, c }) => (
             <div key={l} className="bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3">
               <p className="text-[10px] text-zinc-500 uppercase tracking-wide mb-1">{l}</p>
               <p className={`text-sm font-mono font-semibold ${c}`}>
-                {l === 'Diferencia' && (
-                  errorPositivo
-                    ? <TrendingUp size={11} className="inline mr-0.5" />
-                    : <TrendingDown size={11} className="inline mr-0.5" />
-                )}
                 {v}
               </p>
             </div>
@@ -228,8 +180,8 @@ export function PeriodoModal({ periodo, open, onClose, onUpdate }) {
           <Save size={14} /> Guardar periodo
         </Button>
       </div>
-        </>
-      )}
     </Modal>
+    <ClaseDetailModal isOpen={!!claseDetalle} onClose={() => setClaseDetalle(null)} clase={claseDetalle} />
+    </>
   );
 }

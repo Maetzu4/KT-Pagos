@@ -6,6 +6,7 @@ import { Badge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { CustomSelect } from '../components/ui/CustomSelect';
+import { ClaseDetailModal } from '../components/ui/ClaseDetailModal';
 import { ClaseForm } from '../components/forms/ClaseForm';
 import { useClases } from '../hooks/useClases';
 import { useGrupos } from '../hooks/useGrupos';
@@ -21,6 +22,7 @@ export default function Clases() {
   const [filtroPeriodo, setFiltroPeriodo] = useState('');
   const [search,        setSearch]        = useState('');
   const [modal,         setModal]         = useState(null);
+  const [claseDetalle,  setClaseDetalle]  = useState(null);
   const [deleting,      setDeleting]      = useState(null);
   const [confirmId,     setConfirmId]     = useState(null); // id para ConfirmDialog
 
@@ -212,6 +214,7 @@ export default function Clases() {
             ? 'Sin resultados con los filtros actuales'
             : 'Sin clases registradas'
         }
+        onRowClick={(c) => setClaseDetalle(c)}
       />
 
       {/* ── Modal Editar / Crear ── */}
@@ -237,6 +240,12 @@ export default function Clases() {
         onConfirm={handleDeleteConfirm}
         onCancel={() => setConfirmId(null)}
         destructive
+      />
+
+      <ClaseDetailModal 
+        isOpen={!!claseDetalle} 
+        onClose={() => setClaseDetalle(null)} 
+        clase={claseDetalle} 
       />
     </div>
   );
