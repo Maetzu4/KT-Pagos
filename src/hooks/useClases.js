@@ -61,7 +61,7 @@ export function useClases(filtros = {}) {
     return data;
   };
 
-  const updateClase = async (id, values) => {
+  const updateClase = async (id, values, getOrCreatePeriodo = null) => {
     // ── Snapshot Preservation ──
     // Si el payload incluye recalc: true, recalculamos el precio.
     // De lo contrario, respetamos el precio_cobrado existente y simplemente actualizamos.
@@ -90,6 +90,14 @@ export function useClases(filtros = {}) {
         : tarifa.precio_regular;
 
       finalValues = { ...cleanValues, precio_cobrado };
+    }
+
+    if (cleanValues.fecha_clase && getOrCreatePeriodo) {
+      const originalClase = clases.find(c => c.id === id);
+      if (originalClase && originalClase.fecha_clase !== cleanValues.fecha_clase) {
+        const periodo = await getOrCreatePeriodo(cleanValues.fecha_clase);
+        finalValues.periodo_id = periodo.id;
+      }
     }
 
     const { data, error: err } = await supabase

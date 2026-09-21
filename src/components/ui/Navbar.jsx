@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { LayoutDashboard, Users, BookOpen, BarChart3, Settings, LogOut } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { useTheme } from '../../context/ThemeContext';
+import { ConfirmDialog } from './ConfirmDialog';
 import { cn } from '../../lib/utils';
 
 const NAV_ITEMS = [
@@ -14,6 +16,7 @@ const NAV_ITEMS = [
 
 export function Navbar() {
   const { mode } = useTheme();
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   return (
     <>
@@ -50,7 +53,7 @@ export function Navbar() {
         {/* Botón Logout (Desktop) */}
         <div className="mt-auto px-2">
           <button
-            onClick={() => supabase.auth.signOut()}
+            onClick={() => setShowLogoutConfirm(true)}
             className={cn(
               'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-zinc-600 dark:text-zinc-400',
               'hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30 dark:hover:text-red-400',
@@ -84,20 +87,18 @@ export function Navbar() {
             <span>{label}</span>
           </NavLink>
         ))}
-
-        {/* Botón Logout (Mobile) */}
-        <button
-          onClick={() => supabase.auth.signOut()}
-          className={cn(
-            'flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl text-xs text-zinc-600 dark:text-zinc-400',
-            'hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30 dark:hover:text-red-400',
-            'transition-all duration-200 ease-in-out'
-          )}
-        >
-          <LogOut size={20} className="transition-transform duration-200" />
-          <span>Salir</span>
-        </button>
       </nav>
+
+      {/* Confirmación de Logout */}
+      <ConfirmDialog
+        open={showLogoutConfirm}
+        title="Cerrar Sesión"
+        message="¿Estás seguro de que deseas salir?"
+        confirmText="Salir"
+        onConfirm={() => supabase.auth.signOut()}
+        onCancel={() => setShowLogoutConfirm(false)}
+        destructive
+      />
     </>
   );
 }

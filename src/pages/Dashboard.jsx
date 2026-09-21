@@ -124,10 +124,13 @@ export default function Dashboard() {
       Pagado: p.pagado_real ?? 0,
     }));
 
-  // ── Últimas 10 clases del periodo actual ─────────────────────────
+  // ── Todas las clases del periodo actual ─────────────────────────
   const clasesRecientes = [...(clasesPeriodoActual || [])]
-    .sort((a, b) => b.fecha_clase?.localeCompare(a.fecha_clase))
-    .slice(0, 10);
+    .filter(c => {
+      if (!periodoActual) return false;
+      return c.fecha_clase >= periodoActual.fecha_inicio && c.fecha_clase <= periodoActual.fecha_fin;
+    })
+    .sort((a, b) => b.fecha_clase?.localeCompare(a.fecha_clase));
 
   // ── Columnas de la tabla de grupos activos ────────────────────────
   const cols = [
@@ -211,7 +214,7 @@ export default function Dashboard() {
       </div>
 
       {/* ── Métricas ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard
           label="Total Este Mes"
           value={formatCurrency(estimadoActual)}
@@ -311,7 +314,7 @@ export default function Dashboard() {
           <div className="flex items-center gap-2 mb-3">
             <BookOpen size={15} className="text-zinc-500 dark:text-zinc-400" />
             <h2 className="text-sm font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider">
-              Clases Recientes — {periodoActual.nombre_periodo}
+              Clases — {periodoActual.nombre_periodo}
             </h2>
             {clasesRecientes.length > 0 && (
               <span className="ml-auto text-xs text-zinc-500 font-mono">

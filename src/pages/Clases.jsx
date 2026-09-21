@@ -45,7 +45,7 @@ export default function Clases() {
 
   const handleSubmit = async (values) => {
     if (modal === 'create') await createClase(values, getOrCreatePeriodo);
-    else await updateClase(modal.id, values);
+    else await updateClase(modal.id, values, getOrCreatePeriodo);
     closeModal();
   };
 

@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { AlertTriangle, Save, TrendingDown, TrendingUp, CheckCircle2, RotateCcw } from 'lucide-react';
+import { AlertTriangle, Save, TrendingDown, TrendingUp, CheckCircle2, RotateCcw, ArrowLeft, ExternalLink } from 'lucide-react';
 import { Button } from './Button';
 import { Modal } from './Modal';
 import { FormField, Input, Textarea } from './FormField';
@@ -51,6 +51,7 @@ export function PeriodoModal({ periodo, open, onClose, onUpdate }) {
   const [pagadoReal,   setPagadoReal]   = useState(periodo?.pagado_real ?? 0);
   const [notasReclamo, setNotasReclamo] = useState(periodo?.notas_reclamo ?? '');
   const [saving,       setSaving]       = useState(false);
+  const [claseDetalle, setClaseDetalle] = useState(null);
 
   // Re-sincronizar estado cuando cambia el periodo seleccionado
   const periodoId = periodo?.id;
@@ -81,7 +82,52 @@ export function PeriodoModal({ periodo, open, onClose, onUpdate }) {
   };
 
   return (
-    <Modal open={open} onClose={onClose} title={periodo.nombre_periodo} size="md">
+    <Modal open={open} onClose={() => { setClaseDetalle(null); onClose(); }} title={claseDetalle ? 'Detalle de Clase' : periodo.nombre_periodo} size="md">
+      {claseDetalle ? (
+        <div className="space-y-6">
+          <div className="flex items-center gap-2 mb-2">
+            <Button size="sm" variant="ghost" onClick={() => setClaseDetalle(null)} className="-ml-2">
+              <ArrowLeft size={16} /> Volver
+            </Button>
+          </div>
+          <div className="space-y-4">
+            <div>
+              <p className="text-[10px] text-zinc-500 uppercase tracking-wide mb-1">Nombre / Tema</p>
+              <p className="text-sm font-medium text-zinc-900 dark:text-white">{claseDetalle.nombre_clase || '—'}</p>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-[10px] text-zinc-500 uppercase tracking-wide mb-1">Fecha</p>
+                <p className="text-sm text-zinc-900 dark:text-zinc-100">{formatDate(claseDetalle.fecha_clase)}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-zinc-500 uppercase tracking-wide mb-1">Monto Cobrado</p>
+                <p className="text-sm font-mono text-[var(--accent-color)]">{formatCurrency(claseDetalle.precio_cobrado)}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-zinc-500 uppercase tracking-wide mb-1">Grupo</p>
+                <p className="text-sm text-zinc-900 dark:text-zinc-100">{claseDetalle.grupos?.nombre_grupo || '—'}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-zinc-500 uppercase tracking-wide mb-1">Estado</p>
+                <p className="text-sm text-[var(--accent-color)] font-medium flex items-center gap-1">
+                  <AlertTriangle size={13} /> En Reclamo
+                </p>
+              </div>
+            </div>
+            {claseDetalle.link_grabacion && (
+              <div>
+                <p className="text-[10px] text-zinc-500 uppercase tracking-wide mb-2">Grabación</p>
+                <a href={claseDetalle.link_grabacion} target="_blank" rel="noopener noreferrer">
+                  <Button size="sm" variant="ghost" className="w-full justify-start">
+                    <ExternalLink size={14} className="mr-2" /> Ver grabación
+                  </Button>
+                </a>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
       {/* Scroll interior del modal */}
       <div className="overflow-y-auto max-h-[70vh] space-y-7 pr-1">
 
@@ -148,10 +194,14 @@ export function PeriodoModal({ periodo, open, onClose, onUpdate }) {
               <div className="mt-3 space-y-1.5">
                 <p className="text-xs text-zinc-500 mb-2">Clases marcadas con reclamo:</p>
                 {clasesEnReclamo.map((c) => (
-                  <div key={c.id} className="flex justify-between text-xs text-zinc-800 dark:text-zinc-300 bg-white dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 py-2">
+                  <button
+                    key={c.id}
+                    onClick={() => setClaseDetalle(c)}
+                    className="w-full text-left flex justify-between items-center text-xs text-zinc-800 dark:text-zinc-300 bg-white dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 py-2 hover:border-[var(--accent-color)]/50 transition-colors"
+                  >
                     <span className="truncate">{c.nombre_clase || formatDate(c.fecha_clase) || 'Clase sin nombre'}</span>
                     <span className="font-mono text-[var(--accent-color)] ml-2 shrink-0">{formatCurrency(c.precio_cobrado)}</span>
-                  </div>
+                  </button>
                 ))}
               </div>
             )}
@@ -177,6 +227,7 @@ export function PeriodoModal({ periodo, open, onClose, onUpdate }) {
           <Save size={14} /> Guardar periodo
         </Button>
       </div>
+      )}
     </Modal>
   );
 }

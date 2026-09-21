@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Plus, Pencil, Trash2, Sun, Moon } from 'lucide-react';
+import { Plus, Pencil, Trash2, Sun, Moon, LogOut, Heart } from 'lucide-react';
+import { supabase } from '../lib/supabaseClient';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Toggle } from '../components/ui/Toggle';
@@ -94,6 +95,7 @@ export default function Configuracion() {
   const [modal,    setModal]    = useState(null); // null | 'create' | tarifa
   const [deleting, setDeleting] = useState(null);
   const [confirmId, setConfirmId] = useState(null);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   const handleSubmit = async (values) => {
     if (modal === 'create') await createTarifa(values);
@@ -188,6 +190,38 @@ export default function Configuracion() {
         />
       </Card>
 
+      {/* ── Hecho con amor ── */}
+      <Card>
+        <div className="flex items-center gap-2 mb-4">
+          <Heart size={18} className="text-red-500 fill-red-500" />
+          <h2 className="text-sm font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider">
+            Hecho con amor por <a href="https://github.com/maetzu4" target="_blank" rel="noopener noreferrer" className="text-[var(--accent-color)] hover:underline">Natan Olmos</a>
+          </h2>
+        </div>
+        <div className="space-y-3 text-sm text-zinc-600 dark:text-zinc-400">
+          <p>
+            Si eres de Colombia, puedes apoyar este proyecto por <strong>Breve</strong>. Mi llave es: <span className="font-mono bg-zinc-100 dark:bg-zinc-800 px-1 py-0.5 rounded text-[var(--accent-color)]">6814natsu@gmail.com</span>
+          </p>
+          <p>
+            Si eres del extranjero, puedes apoyarme vía <strong>PayPal</strong> a: <span className="font-mono bg-zinc-100 dark:bg-zinc-800 px-1 py-0.5 rounded text-[var(--accent-color)]">6814natsu@gmail.com</span>
+          </p>
+          <p className="font-medium text-zinc-900 dark:text-zinc-300 mt-2">
+            ¡Gracias por tu apoyo para mantener este proyecto de código abierto!
+          </p>
+        </div>
+      </Card>
+
+      {/* ── Logout (Mobile Alternative) ── */}
+      <div className="md:hidden pt-4 pb-8">
+        <Button
+          variant="danger"
+          className="w-full"
+          onClick={() => setShowLogoutConfirm(true)}
+        >
+          <LogOut size={16} /> Cerrar Sesión
+        </Button>
+      </div>
+
       {/* ── Modal Tarifa ── */}
       <Modal
         open={!!modal}
@@ -210,6 +244,17 @@ export default function Configuracion() {
         confirmText="Eliminar"
         onConfirm={handleDeleteConfirm}
         onCancel={() => setConfirmId(null)}
+        destructive
+      />
+
+      {/* ConfirmDialog Logout */}
+      <ConfirmDialog
+        open={showLogoutConfirm}
+        title="Cerrar Sesión"
+        message="¿Estás seguro de que deseas salir?"
+        confirmText="Salir"
+        onConfirm={() => supabase.auth.signOut()}
+        onCancel={() => setShowLogoutConfirm(false)}
         destructive
       />
     </div>

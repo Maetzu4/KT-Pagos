@@ -8,8 +8,16 @@ export function Modal({ open, onClose, title, children, size = 'md' }) {
 
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose(); };
-    if (open) document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
+    if (open) {
+      document.addEventListener('keydown', onKey);
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = '';
+    };
   }, [open, onClose]);
 
   if (!open) return null;

@@ -34,14 +34,20 @@ export function ClaseForm({ initial, initialGroupId, grupos = [], onSubmit, onCa
   const [form, setForm] = useState(() => getInitialState(initial, initialGroupId));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  
+  const [grupoSearch, setGrupoSearch] = useState(() => {
+    return grupos.find(g => String(g.id) === String(form.grupo_id))?.nombre_grupo || '';
+  });
 
   // Guardar referencia de los valores originales para detectar cambios
   const originalGrupoId = initial?.grupo_id != null ? String(initial.grupo_id) : '';
   const originalEsExtra = Boolean(initial?.es_extra);
 
   useEffect(() => {
-    setForm(getInitialState(initial, initialGroupId));
-  }, [initial, initialGroupId]);
+    const initialState = getInitialState(initial, initialGroupId);
+    setForm(initialState);
+    setGrupoSearch(grupos.find(g => String(g.id) === String(initialState.grupo_id))?.nombre_grupo || '');
+  }, [initial, initialGroupId, grupos]);
 
   const set = (k) => (e) => setForm((p) => ({ ...p, [k]: e.target.value }));
   const setVal = (k) => (v) => setForm((p) => ({ ...p, [k]: v }));
@@ -67,6 +73,10 @@ export function ClaseForm({ initial, initialGroupId, grupos = [], onSubmit, onCa
     }
     if (!form.fecha_clase) {
       setError('La fecha de la clase es obligatoria.');
+      return;
+    }
+    if (!form.nombre_clase?.trim()) {
+      setError('El nombre o tema de la clase es obligatorio.');
       return;
     }
 
@@ -104,13 +114,24 @@ export function ClaseForm({ initial, initialGroupId, grupos = [], onSubmit, onCa
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <FormField label="Grupo" required className="md:col-span-2">
-          <CustomSelect
-            id="grupo_id"
-            value={form.grupo_id ? String(form.grupo_id) : ''}
-            onChange={(val) => setForm((p) => ({ ...p, grupo_id: val }))}
-            options={grupoOptions}
-            placeholder="Selecciona grupo…"
+          <Input
+            id="grupo_id_search"
+            list="grupos-list"
+            value={grupoSearch}
+            onChange={(e) => {
+              const val = e.target.value;
+              setGrupoSearch(val);
+              const matched = grupos.find(g => g.nombre_grupo === val);
+              setForm(p => ({ ...p, grupo_id: matched ? String(matched.id) : '' }));
+            }}
+            placeholder="Escribe para buscar grupo…"
+            autoComplete="off"
           />
+          <datalist id="grupos-list">
+            {grupos.map(g => (
+              <option key={g.id} value={g.nombre_grupo} />
+            ))}
+          </datalist>
         </FormField>
 
         <FormField label="Fecha de Clase" required>
