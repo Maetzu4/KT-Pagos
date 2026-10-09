@@ -10,6 +10,7 @@ import Finanzas      from './pages/Finanzas';
 import Configuracion from './pages/Configuracion';
 import Login         from './pages/Login';
 import Registro      from './pages/Registro';
+import ActualizarPassword from './pages/ActualizarPassword';
 
 function Layout({ children }) {
   return (
@@ -65,6 +66,7 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/registro" element={<Registro />} />
+          <Route path="/actualizar-password" element={<ActualizarPassword />} />
           <Route
             path="/*"
             element={
