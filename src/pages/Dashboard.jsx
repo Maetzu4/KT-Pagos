@@ -84,11 +84,16 @@ function ChartPeriodoModal({ data, onClose }) {
 
 export default function Dashboard() {
   const { gruposActivos, grupos, loading: loadingGrupos } = useGrupos();
-  const { periodos, periodoActual, periodoAnterior, getOrCreatePeriodo, updatePeriodo, loading: loadingPeriodos } = usePeriodos();
-  const { createClase } = useClases();
+  const {
+    periodos, periodoActual, periodoAnterior,
+    getOrCreatePeriodo, updatePeriodo,
+    loading: loadingPeriodos,
+    refetch: refetchPeriodos,
+  } = usePeriodos();
+  const { createClase, refetch: refetchClasesCreate } = useClases();
 
   // Hook adicional de solo lectura para las clases recientes del periodo actual
-  const { clases: clasesPeriodoActual, loading: loadingClasesRecientes } = useClases(
+  const { clases: clasesPeriodoActual, loading: loadingClasesRecientes, refetch: refetchClasesActual } = useClases(
     periodoActual ? { periodo_id: periodoActual.id } : {}
   );
 
@@ -102,6 +107,8 @@ export default function Dashboard() {
   // ── Métricas ─────────────────────────────────────────────────────
   const estimadoActual  = periodoActual?.total_a_cobrar ?? periodoActual?.estimado_real ?? 0;
   const pagadoAnterior  = periodoAnterior?.pagado_real ?? 0;
+  const deudaAnterior   = periodoActual?.deuda_anterior ?? 0;
+  const estadoDeuda     = periodoActual?.estado_deuda_anterior ?? 'al_dia'; // 'al_dia' | 'pendiente' | 'atrasado'
 
   // ── Próxima clase futura GLOBAL ──────────────────────────────────────────
   let proximaClaseGlobalStr = null;
@@ -210,6 +217,8 @@ export default function Dashboard() {
     const finalGrupoId = values.grupo_id || modalGrupo?.id;
     await createClase({ ...values, grupo_id: finalGrupoId }, getOrCreatePeriodo);
     setModalGrupo(null);
+    // Refrescar clases del periodo actual y totales financieros
+    await Promise.all([refetchClasesActual(), refetchPeriodos()]);
   };
 
   return (
@@ -224,7 +233,11 @@ export default function Dashboard() {
         <MetricCard
           label="Total Este Mes"
           value={formatCurrency(estimadoActual)}
-          sub={periodoActual?.nombre_periodo ?? 'Sin periodo activo'}
+          sub={
+            deudaAnterior > 0 && estadoDeuda === 'atrasado'
+              ? `${periodoActual?.nombre_periodo ?? 'Sin periodo'} · incl. deuda arrastrada`
+              : periodoActual?.nombre_periodo ?? 'Sin periodo activo'
+          }
           icon={TrendingUp}
           onClick={() => setSelectedPeriodo(periodoActual)}
           loading={loadingPeriodos}
@@ -232,7 +245,22 @@ export default function Dashboard() {
         <MetricCard
           label="Pago Mes Anterior"
           value={formatCurrency(pagadoAnterior)}
-          sub={periodoAnterior?.nombre_periodo ?? 'Sin periodo anterior'}
+          sub={
+            <span className="flex items-center gap-1.5">
+              <span className="truncate">{periodoAnterior?.nombre_periodo ?? 'Sin periodo anterior'}</span>
+              {deudaAnterior > 0 && (
+                <span
+                  className={`shrink-0 inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
+                    estadoDeuda === 'atrasado'
+                      ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'
+                      : 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400'
+                  }`}
+                >
+                  {estadoDeuda === 'atrasado' ? 'Atrasado' : 'Pendiente'}
+                </span>
+              )}
+            </span>
+          }
           icon={DollarSign}
           onClick={() => setSelectedPeriodo(periodoAnterior)}
           loading={loadingPeriodos}

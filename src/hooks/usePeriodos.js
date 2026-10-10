@@ -26,30 +26,62 @@ export function usePeriodos() {
       return { ...p, estimado_real, deuda_reclamos };
     });
 
-    // ── Paso 2: Calcular arrastre de deuda (Rollover) ──
+    // ── Paso 2: Calcular arrastre de deuda (Rollover con corte día 15) ──
+    // Regla A (días 1-15): la deuda del mes anterior se muestra como "Pendiente"
+    //   pero NO se suma al total_a_cobrar del mes actual.
+    // Regla B (días 16+): la deuda se convierte en "Deuda Arrastrada" y se suma.
+    const hoyDia = new Date().getDate();
+    const esDeudaArrastradaActiva = hoyDia > 15;
+
     // Los períodos están en orden DESC (más reciente primero).
     // Para el arrastre necesitamos el orden cronológico (ASC).
     const cronologico = [...base].sort((a, b) =>
       a.fecha_inicio.localeCompare(b.fecha_inicio)
     );
 
+    // Identificar el índice del período actual para aplicar la regla solo allí
+    const hoyISO = formatISO(new Date());
+    const idxActual = cronologico.findLastIndex(
+      (p) => p.fecha_inicio <= hoyISO && p.fecha_fin >= hoyISO
+    );
+
     const enriched = cronologico.map((p, i) => {
-      // Deuda arrastrada del período anterior
+      // Deuda sin pagar del período anterior
       const prev = cronologico[i - 1];
       const deuda_anterior = prev
         ? Math.max(0, prev.estimado_real - (prev.pagado_real || 0))
         : 0;
 
-      // Total real a cobrar este período
-      const total_a_cobrar = p.estimado_real + deuda_anterior;
+      // Para el período actual aplicamos la regla de corte:
+      //   - Si es día ≤ 15: no arrastramos (deuda queda como "Pendiente")
+      //   - Si es día > 15: sí arrastramos (deuda se suma al total)
+      const esPeriodoActual = i === idxActual;
+      const aplicarArrastre = !esPeriodoActual || esDeudaArrastradaActiva;
 
-      // ¿La deuda anterior quedó resuelta con el pago de este período?
+      const total_a_cobrar = p.estimado_real + (aplicarArrastre ? deuda_anterior : 0);
+
+      // ¿La deuda anterior quedó resuelta?
       const deuda_resuelta = deuda_anterior > 0 && (p.pagado_real || 0) >= total_a_cobrar;
 
       // Error de pago vs total_a_cobrar
       const error_pago = (p.pagado_real || 0) - total_a_cobrar;
 
-      return { ...p, deuda_anterior, total_a_cobrar, deuda_resuelta, error_pago };
+      // Estado visual del mes anterior respecto al período actual
+      // (solo relevante cuando el período previo tiene deuda pendiente)
+      const estado_deuda_anterior = deuda_anterior === 0
+        ? 'al_dia'
+        : esDeudaArrastradaActiva && esPeriodoActual
+          ? 'atrasado'
+          : 'pendiente';
+
+      return {
+        ...p,
+        deuda_anterior,
+        total_a_cobrar,
+        deuda_resuelta,
+        error_pago,
+        estado_deuda_anterior,
+      };
     });
 
     // Devolver en orden DESC (más reciente primero) para la UI
