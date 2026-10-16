@@ -28,7 +28,7 @@ export function ClaseDetailModal({ isOpen, onClose, clase }) {
           </div>
           <div>
             <p className="text-[10px] text-zinc-500 uppercase tracking-wide mb-1">Tipo</p>
-            {clase.es_extra ? <Badge variant="extra">Extra</Badge> : <Badge variant="default">Regular</Badge>}
+            {(clase.es_adicional ?? clase.es_extra) ? <Badge variant="extra">Extra</Badge> : <Badge variant="default">Regular</Badge>}
           </div>
           <div>
             <p className="text-[10px] text-zinc-500 uppercase tracking-wide mb-1">Tarifa Cobrada</p>

@@ -22,7 +22,14 @@ export function Modal({ open, onClose, title, children, size = 'md' }) {
 
   if (!open) return null;
 
-  const sizes = { sm: 'max-w-sm', md: 'max-w-lg', lg: 'max-w-2xl', xl: 'max-w-4xl' };
+  // Tailwind requiere clases completas y estáticas (no interpoladas) para incluirlas en el bundle.
+  const sizeClass = {
+    sm:   'max-w-sm',
+    md:   'max-w-lg',
+    lg:   'max-w-2xl',
+    xl:   'max-w-4xl',
+    full: 'w-[95vw] max-w-[1400px] h-[90vh] max-h-[90vh]',
+  }[size] ?? 'max-w-lg';
 
   return createPortal(
     <div
@@ -31,17 +38,17 @@ export function Modal({ open, onClose, title, children, size = 'md' }) {
       onClick={(e) => { if (e.target === overlayRef.current) onClose(); }}
     >
       <div
-        className={`w-full ${sizes[size]} bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl animate-slide-up`}
+        className={`w-full ${sizeClass} bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl animate-slide-up flex flex-col overflow-hidden`}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-200 dark:border-zinc-800">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 shrink-0">
           <h2 className="text-base font-semibold text-zinc-900 dark:text-white">{title}</h2>
           <Button variant="ghost" size="icon" onClick={onClose} aria-label="Cerrar">
             <X size={16} />
           </Button>
         </div>
-        {/* Body */}
-        <div className="px-6 py-5">{children}</div>
+        {/* Body: flex-1 + overflow-auto para modales normales; el child controla si necesita más */}
+        <div className="flex-1 min-h-0 overflow-auto px-6 py-5">{children}</div>
       </div>
     </div>,
     document.body

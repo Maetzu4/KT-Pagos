@@ -15,7 +15,7 @@ import { formatDate } from '../lib/dateUtils';
 import { formatCurrency } from '../lib/utils';
 
 export default function Clases() {
-  const { periodos, getOrCreatePeriodo } = usePeriodos();
+  const { periodos } = usePeriodos();
   const { grupos } = useGrupos();
 
   const [filtroGrupo,   setFiltroGrupo]   = useState('');
@@ -27,27 +27,38 @@ export default function Clases() {
   const [confirmId,     setConfirmId]     = useState(null); // id para ConfirmDialog
 
   const { clases, loading, createClase, updateClase, deleteClase, toggleReclamo } =
-    useClases({ grupo_id: filtroGrupo || undefined, periodo_id: filtroPeriodo || undefined });
+    useClases({ grupo_id: filtroGrupo || undefined });
 
-  // Filtro de búsqueda de texto libre
-  const clasesFiltradas = search.trim()
-    ? clases.filter((c) => {
-        const q = search.trim().toLowerCase();
-        return (
-          c.nombre_clase?.toLowerCase().includes(q) ||
-          c.grupos?.nombre_grupo?.toLowerCase().includes(q) ||
-          c.periodos?.nombre_periodo?.toLowerCase().includes(q)
-        );
-      })
-    : clases;
+  const getNombrePeriodoClase = (fecha_clase) => {
+    if (!fecha_clase) return '—';
+    const key = fecha_clase.slice(0, 7);
+    const p = periodos.find((p) => p.key_periodo === key || p.id === key);
+    return p?.nombre_periodo ?? key;
+  };
+
+  // Filtro de búsqueda de texto libre y periodo en memoria
+  const clasesFiltradas = clases.filter((c) => {
+    if (filtroPeriodo) {
+      const key = c.fecha_clase?.slice(0, 7);
+      if (key !== filtroPeriodo && String(c.periodo_id) !== String(filtroPeriodo)) return false;
+    }
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      const matchNombre = (c.nombre_clase || c.tema_clase)?.toLowerCase().includes(q);
+      const matchGrupo = c.grupos?.nombre_grupo?.toLowerCase().includes(q);
+      const matchPeriodo = getNombrePeriodoClase(c.fecha_clase)?.toLowerCase().includes(q);
+      return matchNombre || matchGrupo || matchPeriodo;
+    }
+    return true;
+  });
 
   const openCreate = () => setModal('create');
   const openEdit   = (c) => setModal(c);
   const closeModal = () => setModal(null);
 
   const handleSubmit = async (values) => {
-    if (modal === 'create') await createClase(values, getOrCreatePeriodo);
-    else await updateClase(modal.id, values, getOrCreatePeriodo);
+    if (modal === 'create') await createClase(values);
+    else await updateClase(modal.id, values);
     closeModal();
   };
 
@@ -65,22 +76,22 @@ export default function Clases() {
 
   const periodoOptions = [
     { value: '', label: 'Todos los periodos' },
-    ...periodos.map((p) => ({ value: String(p.id), label: p.nombre_periodo })),
+    ...periodos.map((p) => ({ value: p.key_periodo || String(p.id), label: p.nombre_periodo })),
   ];
 
   const columns = [
     { key: 'fecha_clase',  header: 'Fecha',   render: (r) => formatDate(r.fecha_clase) },
     { key: 'grupo',        header: 'Grupo',   render: (r) => r.grupos?.nombre_grupo ?? '—' },
-    { key: 'nombre_clase', header: 'Clase' },
+    { key: 'nombre_clase', header: 'Clase',   render: (r) => r.nombre_clase || r.tema_clase || '—' },
     {
       key: 'periodo',
       header: 'Periodo',
-      render: (r) => <span className="text-zinc-400 text-xs">{r.periodos?.nombre_periodo ?? '—'}</span>,
+      render: (r) => <span className="text-zinc-400 text-xs">{getNombrePeriodoClase(r.fecha_clase)}</span>,
     },
     {
-      key: 'es_extra',
+      key: 'es_adicional',
       header: 'Tipo',
-      render: (r) => r.es_extra
+      render: (r) => (r.es_adicional ?? r.es_extra)
         ? <Badge variant="extra">Extra</Badge>
         : <Badge variant="default">Regular</Badge>,
     },

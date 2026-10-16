@@ -1,17 +1,16 @@
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Users, BookOpen, BarChart3, Settings, LogOut } from 'lucide-react';
+import { LayoutDashboard, Users, BarChart3, Settings, LogOut } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { useTheme } from '../../context/ThemeContext';
 import { ConfirmDialog } from './ConfirmDialog';
 import { cn } from '../../lib/utils';
 
 const NAV_ITEMS = [
-  { to: '/',             icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/grupos',       icon: Users,           label: 'Grupos' },
-  { to: '/clases',       icon: BookOpen,        label: 'Clases' },
-  { to: '/finanzas',     icon: BarChart3,       label: 'Finanzas' },
-  { to: '/configuracion',icon: Settings,        label: 'Config' },
+  { to: '/',              icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/finanzas',      icon: BarChart3,        label: 'Finanzas'  },
+  { to: '/grupos',        icon: Users,            label: 'Grupos'    },
+  { to: '/configuracion', icon: Settings,         label: 'Config'    },
 ];
 
 export function Navbar() {

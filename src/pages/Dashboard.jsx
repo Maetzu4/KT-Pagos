@@ -1,30 +1,45 @@
-import { useState } from 'react';
-import { TrendingUp, DollarSign, Users, Plus, BookOpen, Calendar } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { TrendingUp, DollarSign, Users, CheckCircle2, Calendar, Plus } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid,
 } from 'recharts';
 import { MetricCard } from '../components/ui/Card';
-import { Button } from '../components/ui/Button';
 import { Table } from '../components/ui/Table';
 import { Badge } from '../components/ui/Badge';
+import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { GrupoDetailModal } from '../components/ui/GrupoDetailModal';
 import { PeriodoModal } from '../components/ui/PeriodoModal';
-import { ClaseDetailModal } from '../components/ui/ClaseDetailModal';
-import { ClaseForm } from '../components/forms/ClaseForm';
+import { ClaseExtraModal } from '../components/modals/ClaseExtraModal';
 import { useGrupos } from '../hooks/useGrupos';
 import { usePeriodos } from '../hooks/usePeriodos';
 import { useClases } from '../hooks/useClases';
+import { useCountUp } from '../hooks/useCountUp';
 import { formatCurrency } from '../lib/utils';
-import { formatDate, parseISO, calcularProximaClaseEsperada } from '../lib/dateUtils';
 
-// Custom Tooltip para Recharts — adaptable al tema
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * Precio efectivo de una clase.
+ * Si precio_cobrado está seteado lo usa; si no, cae al precio_regular de la tarifa del grupo.
+ */
+const getPrecio = (c) =>
+  Number(c.precio_cobrado ?? c.grupos?.tarifas?.precio_regular ?? 0);
+
+/** Formatea 'YYYY-MM-DD' → 'DD/MM/YYYY' */
+function fmtFecha(str) {
+  if (!str) return '—';
+  const clean = str.split('T')[0].split(' ')[0];
+  const [y, m, d] = clean.split('-');
+  return `${d}/${m}/${y}`;
+}
+
+// ─── Custom Tooltip (gráfica) ─────────────────────────────────────────────────
 function CustomTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
   return (
-    <div
-      className="rounded-xl px-4 py-3 shadow-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white text-sm"
-    >
+    <div className="rounded-xl px-4 py-3 shadow-xl border border-zinc-200 dark:border-zinc-800
+                    bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white text-sm">
       <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2 font-medium">{label}</p>
       {payload.map((p) => (
         <p key={p.name} className="font-medium" style={{ color: p.color }}>
@@ -35,260 +50,360 @@ function CustomTooltip({ active, payload, label }) {
   );
 }
 
-/** Devuelve "Hoy", "Mañana" o la fecha formateada para una fecha ISO string. */
-function labelFechaRelativa(fechaISO) {
-  if (!fechaISO) return '—';
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const target = parseISO(fechaISO);
-  const diffMs = target.getTime() - today.getTime();
-  const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
-  if (diffDays === 0) return 'Hoy';
-  if (diffDays === 1) return 'Mañana';
-  return formatDate(fechaISO);
-}
-
-function ChartPeriodoModal({ data, onClose }) {
-  const { clases, loading } = useClases(data ? { periodo_id: data.id } : {});
-
-  if (!data) return null;
-
-  return (
-    <Modal open={!!data} onClose={onClose} title={`Clases de ${data.name}`} size="md">
-      <div className="max-h-[60vh] overflow-y-auto pr-1 space-y-2">
-        {loading ? (
-          <p className="text-zinc-500 text-sm italic">Cargando...</p>
-        ) : clases.length === 0 ? (
-          <p className="text-zinc-500 text-sm italic">No hay clases en este periodo.</p>
-        ) : (
-          clases.sort((a, b) => b.fecha_clase.localeCompare(a.fecha_clase)).map((c) => (
-            <div 
-              key={c.id} 
-              className="flex justify-between items-center text-sm p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/40 cursor-pointer hover:border-[var(--accent-color)]/50 transition-colors"
-              onClick={() => onClose(c)}
-            >
-              <div>
-                <p className="font-semibold text-zinc-900 dark:text-white truncate max-w-[200px]">{c.nombre_clase || 'Sin nombre'}</p>
-                <p className="text-xs text-zinc-500 mt-0.5">{formatDate(c.fecha_clase)} — {c.grupos?.nombre_grupo ?? 'Sin grupo'}</p>
-              </div>
-              <span className="font-mono text-zinc-900 dark:text-zinc-100 font-medium">
-                {formatCurrency(c.precio_cobrado)}
-              </span>
-            </div>
-          ))
-        )}
-      </div>
-    </Modal>
-  );
-}
-
+// ─── Dashboard ────────────────────────────────────────────────────────────────
 export default function Dashboard() {
   const { gruposActivos, grupos, loading: loadingGrupos } = useGrupos();
   const {
     periodos, periodoActual, periodoAnterior,
-    getOrCreatePeriodo, updatePeriodo,
+    updatePeriodo,
     loading: loadingPeriodos,
-    refetch: refetchPeriodos,
   } = usePeriodos();
-  const { createClase, refetch: refetchClasesCreate } = useClases();
 
-  // Hook adicional de solo lectura para las clases recientes del periodo actual
-  const { clases: clasesPeriodoActual, loading: loadingClasesRecientes, refetch: refetchClasesActual } = useClases(
-    periodoActual ? { periodo_id: periodoActual.id } : {}
+  // Clases del periodo actual — incluye estado_clase y precio/tarifa
+  const {
+    clases: clasesMes,
+    loading: loadingClases,
+    refetch: refetchClases,
+    updateClase,
+  } = useClases(
+    periodoActual
+      ? { fecha_inicio: periodoActual.fecha_inicio, fecha_fin: periodoActual.fecha_fin }
+      : {}
   );
 
-  const [modalGrupo, setModalGrupo] = useState(null);
-  const [detalle, setDetalle] = useState(null);
-  const [chartDetalle, setChartDetalle] = useState(null);
-  const [selectedPeriodo, setSelectedPeriodo] = useState(null);
-  const [claseDetalle, setClaseDetalle] = useState(null);
-  const [chartPeriodos, setChartPeriodos] = useState(8); // periodos visibles en la gráfica
+  const clasesFiltradas = useMemo(() => {
+    if (!periodoActual?.key_periodo || !clasesMes) return [];
+    return clasesMes.filter((c) => c.fecha_clase?.startsWith(periodoActual.key_periodo));
+  }, [clasesMes, periodoActual]);
 
-  // ── Métricas ─────────────────────────────────────────────────────
-  const estimadoActual  = periodoActual?.total_a_cobrar ?? periodoActual?.estimado_real ?? 0;
-  const pagadoAnterior  = periodoAnterior?.pagado_real ?? 0;
-  const deudaAnterior   = periodoActual?.deuda_anterior ?? 0;
-  const estadoDeuda     = periodoActual?.estado_deuda_anterior ?? 'al_dia'; // 'al_dia' | 'pendiente' | 'atrasado'
+  const [detalle,          setDetalle]          = useState(null);
+  const [selectedPeriodo,  setSelectedPeriodo]  = useState(null);
+  const [chartPeriodos,    setChartPeriodos]    = useState(() => Number(localStorage.getItem('chartPeriodos')) || 8);
+  const [isExtraModalOpen, setIsExtraModalOpen] = useState(false);
 
-  // ── Próxima clase futura GLOBAL ──────────────────────────────────────────
-  let proximaClaseGlobalStr = null;
-  let proximaGrupoObj = null;
+  const handleChartChange = (n) => {
+    setChartPeriodos(n);
+    localStorage.setItem('chartPeriodos', n);
+  };
 
-  for (const grupo of gruposActivos) {
-    const cG = (clasesPeriodoActual || []).filter(c => c.grupo_id === grupo.id);
-    const prox = calcularProximaClaseEsperada(grupo, cG);
-    if (prox) {
-      if (!proximaClaseGlobalStr || prox < proximaClaseGlobalStr) {
-        proximaClaseGlobalStr = prox;
-        proximaGrupoObj = grupo;
-      }
+  const hoyStr = new Date().toISOString().split('T')[0];
+  const pendientes = useMemo(() => {
+    return clasesFiltradas
+      .filter((c) => c.fecha_clase <= hoyStr && c.estado_clase === 'Programada')
+      .slice()
+      .sort((a, b) => (a.fecha_clase ?? '').localeCompare(b.fecha_clase ?? ''));
+  }, [clasesFiltradas, hoyStr]);
+
+  const [updatingClase, setUpdatingClase] = useState(null);
+
+  const handleCambiarEstado = async (claseId, nuevoEstado) => {
+    setUpdatingClase(`${claseId}-${nuevoEstado}`);
+    try {
+      await updateClase(claseId, { estado_clase: nuevoEstado });
+      await refetchClases?.();
+    } catch (err) {
+      console.error('Error al actualizar estado de clase:', err);
+    } finally {
+      setUpdatingClase(null);
     }
-  }
+  };
 
-  const proximaLabel = proximaClaseGlobalStr ? labelFechaRelativa(proximaClaseGlobalStr) : 'Sin programar';
+  // ── Métricas V2 ─────────────────────────────────────────────────────────────
+  const { proyectado, ganado, totalMes, completadas } = useMemo(() => {
+    const all            = clasesFiltradas;
+    const totalMes       = all.length;
+    const completadasArr = all.filter((c) => c.estado_clase === 'Completada');
 
-  // ── Datos para la gráfica ─────────────────────────────────────────
-  const chartData = [...periodos]
-    .sort((a, b) => a.fecha_inicio?.localeCompare(b.fecha_inicio))
-    .slice(-chartPeriodos)
-    .map((p) => ({
-      name: p.nombre_periodo?.split(' ')[0] ?? p.nombre_periodo,
-      Estimado: p.total_a_cobrar ?? p.estimado_real,
-      Pagado: p.pagado_real ?? 0,
-    }));
+    const proyectado = all.reduce((s, c) => Number(s) + Number(getPrecio(c)), 0);
+    const ganado     = completadasArr.reduce((s, c) => Number(s) + Number(getPrecio(c)), 0);
 
-  // ── Todas las clases del periodo actual ─────────────────────────
-  const clasesRecientes = [...(clasesPeriodoActual || [])]
-    .filter(c => {
-      if (!periodoActual) return false;
-      return c.fecha_clase >= periodoActual.fecha_inicio && c.fecha_clase <= periodoActual.fecha_fin;
-    })
-    .sort((a, b) => b.fecha_clase?.localeCompare(a.fecha_clase));
+    return { proyectado, ganado, totalMes, completadas: completadasArr.length };
+  }, [clasesFiltradas]);
 
-  // ── Columnas de la tabla de grupos activos ────────────────────────
-  const cols = [
-    { key: 'nombre_grupo', header: 'Grupo' },
+  // Números animados UX
+  const animProyectado    = useCountUp(proyectado);
+  const animGanado        = useCountUp(ganado);
+  const animMesAnterior   = useCountUp(periodoAnterior?.pagado_real ?? 0);
+  const animCompletadas   = useCountUp(completadas);
+  const animGruposActivos = useCountUp(gruposActivos.length);
+
+  // ── Progreso por grupo (clases completadas en el periodo actual) ───────────
+  const progresoByGrupo = useMemo(() => {
+    const map = {};
+    clasesFiltradas.forEach((c) => {
+      if (!map[c.grupo_id]) map[c.grupo_id] = { total: 0, completadas: 0 };
+      map[c.grupo_id].total++;
+      if (c.estado_clase === 'Completada') map[c.grupo_id].completadas++;
+    });
+    return map;
+  }, [clasesFiltradas]);
+
+  // ── Datos para la gráfica ────────────────────────────────────────────────
+  const chartData = useMemo(() =>
+    [...periodos]
+      .sort((a, b) => a.fecha_inicio?.localeCompare(b.fecha_inicio))
+      .slice(-chartPeriodos)
+      .map((p) => ({
+        name:      p.nombre_periodo?.split(' ')[0] ?? p.nombre_periodo,
+        Estimado:  Number(p.total_a_cobrar ?? p.estimado_real ?? 0),
+        Cobrado:   Number(p.pagado_real ?? 0),
+      })),
+    [periodos, chartPeriodos]
+  );
+
+  // ── Deuda arrastrada (lógica V1 conservada) ──────────────────────────────
+  const deudaAnterior = Number(periodoActual?.deuda_anterior ?? 0);
+  const estadoDeuda   = periodoActual?.estado_deuda_anterior ?? 'al_dia';
+
+  // ── Columnas tabla grupos activos (V2) ───────────────────────────────────
+  const colsGrupos = [
     {
-      key: 'estado',
-      header: 'Estado',
-      render: (r) => <Badge variant={r.estado}>{r.estado === 'activo' ? 'Activo' : 'Finalizado'}</Badge>,
-    },
-    {
-      key: 'tarifa',
-      header: 'Tarifa',
-      render: (r) => r.tarifas ? formatCurrency(r.tarifas.precio_regular) : '—',
-    },
-    {
-      key: 'proxima',
-      header: 'Próxima Clase',
-      render: (r) => {
-        const clasesDelGrupo = (clasesPeriodoActual || []).filter(c => c.grupo_id === r.id);
-        const futura = calcularProximaClaseEsperada(r, clasesDelGrupo);
-        return <span className="text-xs text-zinc-500">{futura ? labelFechaRelativa(futura) : 'Sin programar'}</span>;
-      }
-    },
-    {
-      key: 'actions',
-      header: '',
-      cellClassName: 'text-right',
+      key: 'nombre_grupo',
+      header: 'Grupo',
       render: (r) => (
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={(e) => { e.stopPropagation(); setModalGrupo(r); }}
-          id={`btn-add-clase-${r.id}`}
-        >
-          <Plus size={14} /> Añadir Clase
-        </Button>
+        <div className="flex items-center gap-2">
+          <span className="font-medium text-zinc-900 dark:text-white">{r.nombre_grupo ?? '—'}</span>
+          {r.id_externo?.includes('PRM') && (
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold border border-[var(--accent-color)] text-[var(--accent-color)] bg-[var(--accent-color)]/10">
+              PRM
+            </span>
+          )}
+        </div>
       ),
     },
+    {
+      key: 'curso_nombre',
+      header: 'Curso',
+      render: (r) => (
+        <span className="text-zinc-600 dark:text-zinc-400 text-sm truncate max-w-[160px] block">
+          {r.curso_nombre ?? <span className="italic text-zinc-400">—</span>}
+        </span>
+      ),
+    },
+    {
+      key: 'horario',
+      header: 'Horario',
+      render: (r) => (
+        <span className="text-zinc-500 text-sm">
+          {r.horario ?? <span className="italic text-zinc-400">—</span>}
+        </span>
+      ),
+    },
+    {
+      key: 'progreso',
+      header: 'Progreso (mes)',
+      render: (r) => {
+        const p = progresoByGrupo[r.id];
+        if (!p) return <span className="text-zinc-400 italic text-xs">Sin clases</span>;
+        const pct = p.total > 0 ? Math.round((p.completadas / p.total) * 100) : 0;
+        return (
+          <div className="flex items-center gap-2 min-w-[100px]">
+            <div className="flex-1 h-1.5 rounded-full bg-zinc-200 dark:bg-zinc-700 overflow-hidden">
+              <div
+                className="h-full rounded-full bg-[var(--accent-color)] transition-all duration-500"
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+            <span className="text-xs text-zinc-500 tabular-nums whitespace-nowrap">
+              {p.completadas}/{p.total}
+            </span>
+          </div>
+        );
+      },
+    },
   ];
-
-  // ── Columnas de Clases Recientes ──────────────────────────────────
-  const colsClases = [
-    { key: 'fecha_clase', header: 'Fecha',  render: (r) => formatDate(r.fecha_clase) },
-    { key: 'grupo',       header: 'Grupo',  render: (r) => r.grupos?.nombre_grupo ?? '—' },
-    { key: 'nombre_clase',header: 'Clase',  render: (r) => r.nombre_clase || <span className="text-zinc-500 italic">Sin nombre</span> },
-    {
-      key: 'es_extra',
-      header: 'Tipo',
-      render: (r) => r.es_extra
-        ? <Badge variant="extra">Extra</Badge>
-        : <Badge variant="default">Regular</Badge>,
-    },
-    {
-      key: 'precio_cobrado',
-      header: 'Precio',
-      render: (r) => <span className="font-mono text-xs">{formatCurrency(r.precio_cobrado)}</span>,
-    },
-    {
-      key: 'en_reclamo',
-      header: '',
-      cellClassName: 'text-center',
-      render: (r) => r.en_reclamo
-        ? <span className="inline-flex text-[var(--accent-color)]" title="En reclamo">
-            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
-          </span>
-        : null,
-    },
-  ];
-
-  const handleAddClase = async (values) => {
-    const finalGrupoId = values.grupo_id || modalGrupo?.id;
-    await createClase({ ...values, grupo_id: finalGrupoId }, getOrCreatePeriodo);
-    setModalGrupo(null);
-    // Refrescar clases del periodo actual y totales financieros
-    await Promise.all([refetchClasesActual(), refetchPeriodos()]);
-  };
 
   return (
     <div className="space-y-8 animate-fade-in">
-      <div>
-        <h1 className="text-2xl font-semibold text-zinc-900 dark:text-white">Dashboard</h1>
-        <p className="text-sm text-zinc-500 mt-1">Resumen financiero de tutorías</p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold text-zinc-900 dark:text-white">Dashboard</h1>
+          <p className="text-sm text-zinc-500 mt-1">
+            {periodoActual?.nombre_periodo
+              ? `Resumen de ${periodoActual.nombre_periodo}`
+              : 'Resumen financiero de tutorías'}
+          </p>
+        </div>
+        <Button
+          onClick={() => setIsExtraModalOpen(true)}
+          id="btn-add-clase-extra-dashboard"
+          className="shadow-sm"
+        >
+          <Plus size={16} /> Añadir Extra
+        </Button>
       </div>
 
-      {/* ── Métricas ── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard
-          label="Total Este Mes"
-          value={formatCurrency(estimadoActual)}
-          sub={
-            deudaAnterior > 0 && estadoDeuda === 'atrasado'
-              ? `${periodoActual?.nombre_periodo ?? 'Sin periodo'} · incl. deuda arrastrada`
-              : periodoActual?.nombre_periodo ?? 'Sin periodo activo'
-          }
-          icon={TrendingUp}
-          onClick={() => setSelectedPeriodo(periodoActual)}
-          loading={loadingPeriodos}
-        />
-        <MetricCard
-          label="Pago Mes Anterior"
-          value={formatCurrency(pagadoAnterior)}
-          sub={
-            <span className="flex items-center gap-1.5">
-              <span className="truncate">{periodoAnterior?.nombre_periodo ?? 'Sin periodo anterior'}</span>
-              {deudaAnterior > 0 && (
-                <span
-                  className={`shrink-0 inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
-                    estadoDeuda === 'atrasado'
-                      ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'
-                      : 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400'
-                  }`}
-                >
-                  {estadoDeuda === 'atrasado' ? 'Atrasado' : 'Pendiente'}
-                </span>
-              )}
+      {/* ── Hero Banner: Proyectado del Mes (Bloque sólido) ── */}
+      <div className="rounded-2xl bg-[var(--accent-color)] p-6 sm:p-8 text-white shadow-lg shadow-[var(--accent-color)]/20">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-white/20 text-white backdrop-blur-sm">
+            <TrendingUp size={13} /> Proyectado del Mes
+          </span>
+          {periodoActual?.nombre_periodo && (
+            <span className="text-xs text-white/80 font-medium">
+              · {periodoActual.nombre_periodo}
             </span>
+          )}
+        </div>
+        <div className="text-3xl sm:text-5xl font-bold tracking-tight text-white font-mono mt-1">
+          {formatCurrency(animProyectado)}
+        </div>
+      </div>
+
+      {/* ── KPIs (Grid de 4 tarjetas) ── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Ganado este Mes */}
+        <MetricCard
+          label="Ganado este Mes"
+          value={formatCurrency(animGanado)}
+          sub="Solo clases completadas"
+          icon={DollarSign}
+          loading={loadingClases}
+        />
+
+        {/* Mes Anterior */}
+        <MetricCard
+          label="Mes Anterior"
+          value={formatCurrency(animMesAnterior)}
+          sub={
+            periodoAnterior?.error_pago < 0 ? (
+              <span className="flex items-center gap-1.5">
+                <span className="truncate">Falta {formatCurrency(Math.abs(periodoAnterior.error_pago))}</span>
+                <span className="shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold bg-[var(--accent-color)]/10 text-[var(--accent-color)]">
+                  {new Date().getDate() > 15 ? 'Atrasado' : 'Pendiente'}
+                </span>
+              </span>
+            ) : (
+              periodoAnterior?.nombre_periodo
+                ? `${periodoAnterior.nombre_periodo} · Al día`
+                : 'Sin periodo anterior'
+            )
           }
           icon={DollarSign}
-          onClick={() => setSelectedPeriodo(periodoAnterior)}
+          onClick={() => periodoAnterior && setSelectedPeriodo(periodoAnterior)}
           loading={loadingPeriodos}
         />
+
+        {/* Clases impartidas */}
+        <MetricCard
+          label="Clases Impartidas"
+          value={`${Math.round(animCompletadas)} de ${totalMes}`}
+          sub={
+            totalMes > 0
+              ? `${Math.round((completadas / totalMes) * 100)}% completado este mes`
+              : 'Sin clases este mes'
+          }
+          icon={CheckCircle2}
+          loading={loadingClases}
+        />
+
+        {/* Grupos activos */}
         <MetricCard
           label="Grupos Activos"
-          value={gruposActivos.length}
+          value={Math.round(animGruposActivos)}
           sub={`de ${grupos.length} grupos totales`}
           icon={Users}
           loading={loadingGrupos}
         />
-        <MetricCard
-          label="Próxima Clase"
-          value={proximaLabel}
-          sub={proximaGrupoObj?.nombre_grupo ?? (proximaClaseGlobalStr ? '' : 'Sin clases programadas')}
-          icon={Calendar}
-          onClick={() => proximaGrupoObj && setDetalle(proximaGrupoObj)}
-          loading={loadingGrupos || loadingClasesRecientes}
-        />
       </div>
 
-      {/* ── Tabla de grupos activos ── */}
+      {/* ── Clases Pendientes ── */}
+      <section>
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <h2 className="text-sm font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider">
+              Clases Pendientes
+            </h2>
+            {pendientes.length > 0 && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-[var(--accent-color)]/10 text-[var(--accent-color)]">
+                {pendientes.length}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {pendientes.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-zinc-200 dark:border-zinc-800 p-6 text-center">
+            <p className="text-sm text-zinc-400 dark:text-zinc-500">
+              No tienes clases programadas pendientes
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {pendientes.map((c) => {
+              const nombreGrupo = c.grupos?.nombre_grupo ?? grupos.find((g) => g.id === c.grupo_id)?.nombre_grupo ?? 'Grupo';
+              const tema = c.tema_clase ?? c.nombre_clase ?? 'Clase programada';
+              const esAtrasada = c.fecha_clase < hoyStr;
+
+              return (
+                <div
+                  key={c.id}
+                  className="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm hover:border-[var(--accent-color)]/40 transition-colors flex flex-col justify-between gap-3"
+                >
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                      <span className="text-xs tabular-nums text-zinc-500 dark:text-zinc-400 font-medium">
+                        {fmtFecha(c.fecha_clase)}
+                      </span>
+                      {esAtrasada && (
+                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[var(--accent-color)]/10 text-[var(--accent-color)]">
+                          Atrasada
+                        </span>
+                      )}
+                      {c.es_adicional && (
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[var(--accent-color)]/10 text-[var(--accent-color)] ring-1 ring-inset ring-[var(--accent-color)]/20">
+                          EXTRA
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm font-semibold text-zinc-900 dark:text-white truncate">
+                      {nombreGrupo}
+                    </p>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate mt-0.5">
+                      {tema}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 pt-2 border-t border-zinc-100 dark:border-zinc-800/60">
+                    <button
+                      type="button"
+                      disabled={!!updatingClase}
+                      onClick={() => handleCambiarEstado(c.id, 'Completada')}
+                      className="flex-1 py-1.5 px-2 rounded-lg text-xs font-semibold bg-[var(--accent-color)] text-white shadow-sm hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 text-center"
+                    >
+                      {updatingClase === `${c.id}-Completada` ? '...' : 'Completada'}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!!updatingClase}
+                      onClick={() => handleCambiarEstado(c.id, 'Aplazada')}
+                      className="flex-1 py-1.5 px-2 rounded-lg text-xs font-medium border border-[var(--accent-color)] text-[var(--accent-color)] bg-transparent hover:bg-[var(--accent-color)]/10 active:scale-[0.98] transition-all disabled:opacity-50 text-center"
+                    >
+                      {updatingClase === `${c.id}-Aplazada` ? '...' : 'Aplazada'}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!!updatingClase}
+                      onClick={() => handleCambiarEstado(c.id, 'Cancelada')}
+                      className="flex-1 py-1.5 px-2 rounded-lg text-xs font-medium text-[var(--accent-color)] hover:bg-[var(--accent-color)]/10 border border-transparent hover:border-[var(--accent-color)]/20 active:scale-[0.98] transition-all disabled:opacity-50 text-center"
+                    >
+                      {updatingClase === `${c.id}-Cancelada` ? '...' : 'Cancelada'}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      {/* ── Tabla de grupos activos (V2) ── */}
       <section>
         <h2 className="text-sm font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider mb-3">
           Grupos Activos
         </h2>
         <Table
-          columns={cols}
+          columns={colsGrupos}
           data={gruposActivos}
           loading={loadingGrupos}
           emptyMessage="No hay grupos activos"
@@ -296,18 +411,17 @@ export default function Dashboard() {
         />
       </section>
 
-      {/* ── Gráfica Histórica ── */}
+      {/* ── Gráfica histórica ── */}
       <section>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider">
             Gráfica Histórica
           </h2>
-          {/* Selector de cantidad de periodos */}
           <div className="flex items-center gap-1">
             {[4, 6, 8, 12].map((n) => (
               <button
                 key={n}
-                onClick={() => setChartPeriodos(n)}
+                onClick={() => handleChartChange(n)}
                 className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-150 ${
                   chartPeriodos === n
                     ? 'bg-[var(--accent-color)] text-white shadow-sm'
@@ -330,69 +444,25 @@ export default function Dashboard() {
                 tickLine={false}
                 tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
               />
-              <Tooltip
-                content={<CustomTooltip />}
-                cursor={{ fill: 'rgba(128,128,128,0.06)', radius: 6 }}
-              />
+              <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(128,128,128,0.06)', radius: 6 }} />
               <Legend wrapperStyle={{ fontSize: '12px', color: '#a1a1aa' }} />
-              <Bar dataKey="Estimado" fill="var(--accent-color)" radius={[4, 4, 0, 0]} maxBarSize={40} onClick={(data) => setChartDetalle(data.payload)} className="cursor-pointer hover:opacity-80 transition-opacity" />
-              <Bar dataKey="Pagado" fill="var(--accent-dark)" opacity={0.75} radius={[4, 4, 0, 0]} maxBarSize={40} onClick={(data) => setChartDetalle(data.payload)} className="cursor-pointer hover:opacity-100 transition-opacity" />
+              <Bar dataKey="Estimado" fill="var(--accent-color)"  radius={[4,4,0,0]} maxBarSize={40} />
+              <Bar dataKey="Cobrado"  fill="var(--accent-dark)"   radius={[4,4,0,0]} maxBarSize={40} opacity={0.75} />
             </BarChart>
           </ResponsiveContainer>
         </div>
       </section>
 
-      {/* ── Clases Recientes del Periodo en Curso ── */}
-      {periodoActual && (
-        <section>
-          <div className="flex items-center gap-2 mb-3">
-            <BookOpen size={15} className="text-zinc-500 dark:text-zinc-400" />
-            <h2 className="text-sm font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider">
-              Clases — {periodoActual.nombre_periodo}
-            </h2>
-            {clasesRecientes.length > 0 && (
-              <span className="ml-auto text-xs text-zinc-500 font-mono">
-                {clasesRecientes.length} clases · {formatCurrency(
-                  clasesRecientes.reduce((s, c) => s + (c.precio_cobrado || 0), 0)
-                )}
-              </span>
-            )}
-          </div>
-          <Table
-            columns={colsClases}
-            data={clasesRecientes}
-            loading={loadingClasesRecientes}
-            emptyMessage="Sin clases registradas en el periodo actual"
-            onRowClick={(c) => setClaseDetalle(c)}
-          />
-        </section>
-      )}
 
-      {/* ── Modal Quick-Add Clase ── */}
-      <Modal
-        open={!!modalGrupo}
-        onClose={() => setModalGrupo(null)}
-        title={`Añadir Clase — ${modalGrupo?.nombre_grupo ?? ''}`}
-      >
-        {modalGrupo && (
-          <ClaseForm
-            initialGroupId={modalGrupo.id}
-            initial={{ grupo_id: modalGrupo.id }}
-            grupos={grupos}
-            onSubmit={handleAddClase}
-            onCancel={() => setModalGrupo(null)}
-          />
-        )}
-      </Modal>
 
-      {/* Modal de detalle (clic en fila) */}
+      {/* ── Modal de detalle del grupo (clic en fila) ── */}
       <GrupoDetailModal
         grupo={detalle}
         open={!!detalle}
         onClose={() => setDetalle(null)}
-        readOnly={true}
       />
 
+      {/* ── Modal de período ── */}
       <PeriodoModal
         periodo={selectedPeriodo}
         open={!!selectedPeriodo}
@@ -400,20 +470,11 @@ export default function Dashboard() {
         onUpdate={updatePeriodo}
       />
 
-      <ChartPeriodoModal 
-        data={chartDetalle}
-        onClose={(c) => {
-          setChartDetalle(null);
-          if (c && c.id) {
-            setClaseDetalle(c);
-          }
-        }}
-      />
-
-      <ClaseDetailModal 
-        isOpen={!!claseDetalle} 
-        onClose={() => setClaseDetalle(null)} 
-        clase={claseDetalle} 
+      {/* ── Modal Clase Extra ── */}
+      <ClaseExtraModal
+        isOpen={isExtraModalOpen}
+        onClose={() => setIsExtraModalOpen(false)}
+        onSuccess={() => refetchClases?.()}
       />
     </div>
   );

@@ -9,8 +9,7 @@ const DEFAULT = {
   grupo_id: '',
   fecha_clase: '',
   nombre_clase: '',
-  es_extra: false,
-  link_grabacion: '',
+  es_adicional: false,
   en_reclamo: false,
 };
 
@@ -23,9 +22,8 @@ function getInitialState(initial, initialGroupId) {
     ...initial,
     grupo_id: defaultGrupoId != null ? String(defaultGrupoId) : '',
     fecha_clase: initial?.fecha_clase || todayStr,
-    nombre_clase: initial?.nombre_clase ?? '',
-    es_extra: Boolean(initial?.es_extra),
-    link_grabacion: initial?.link_grabacion ?? '',
+    nombre_clase: initial?.nombre_clase ?? initial?.tema_clase ?? '',
+    es_adicional: Boolean(initial?.es_adicional ?? initial?.es_extra),
     en_reclamo: Boolean(initial?.en_reclamo),
   };
 }
@@ -42,7 +40,7 @@ export function ClaseForm({ initial, initialGroupId, grupos = [], onSubmit, onCa
 
   // Guardar referencia de los valores originales para detectar cambios
   const originalGrupoId = initial?.grupo_id != null ? String(initial.grupo_id) : '';
-  const originalEsExtra = Boolean(initial?.es_extra);
+  const originalEsAdicional = Boolean(initial?.es_adicional ?? initial?.es_extra);
 
   useEffect(() => {
     const initialState = getInitialState(initial, initialGroupId);
@@ -56,15 +54,15 @@ export function ClaseForm({ initial, initialGroupId, grupos = [], onSubmit, onCa
   // Previsualización del precio según tarifa del grupo seleccionado
   const grupoSel = grupos.find((g) => String(g.id) === String(form.grupo_id));
   const precioPreview = grupoSel?.tarifas
-    ? form.es_extra
+    ? form.es_adicional
       ? grupoSel.tarifas.precio_extra
       : grupoSel.tarifas.precio_regular
     : null;
 
   // Detectar si el precio snapshot debe recalcularse
   const grupoChanged = String(form.grupo_id) !== originalGrupoId;
-  const esExtraChanged = form.es_extra !== originalEsExtra;
-  const needsRecalc = !initial?.id || grupoChanged || esExtraChanged;
+  const esAdicionalChanged = form.es_adicional !== originalEsAdicional;
+  const needsRecalc = !initial?.id || grupoChanged || esAdicionalChanged;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -93,8 +91,8 @@ export function ClaseForm({ initial, initialGroupId, grupos = [], onSubmit, onCa
       grupo_id: cleanGrupoId,
       fecha_clase: form.fecha_clase,
       nombre_clase: form.nombre_clase?.trim() || null,
-      es_extra: Boolean(form.es_extra),
-      link_grabacion: form.link_grabacion?.trim() || null,
+      tema_clase: form.nombre_clase?.trim() || null,
+      es_adicional: Boolean(form.es_adicional),
       en_reclamo: Boolean(form.en_reclamo),
       // El hook useClases verá esta bandera para decidir si recalcula el snapshot
       recalc: needsRecalc,
@@ -176,13 +174,13 @@ export function ClaseForm({ initial, initialGroupId, grupos = [], onSubmit, onCa
         </FormField>
 
         {/* Motor de precios visible al usuario */}
-        <FormField label="¿Clase Extra?">
+        <FormField label="¿Clase Adicional / Extra?">
           <div className="flex items-center gap-4 mt-1">
             <Toggle
-              id="es_extra"
-              checked={form.es_extra}
-              onChange={setVal('es_extra')}
-              label={form.es_extra ? 'Sí' : 'No'}
+              id="es_adicional"
+              checked={form.es_adicional}
+              onChange={setVal('es_adicional')}
+              label={form.es_adicional ? 'Sí' : 'No'}
             />
             {precioPreview !== null && (
               <span className="text-sm font-mono bg-[var(--accent-color)]/10 text-[var(--accent-color)] border border-transparent px-3 py-1 rounded-md">
@@ -190,16 +188,6 @@ export function ClaseForm({ initial, initialGroupId, grupos = [], onSubmit, onCa
               </span>
             )}
           </div>
-        </FormField>
-
-        <FormField label="Link de Grabación">
-          <Input
-            id="link_grabacion"
-            type="url"
-            value={form.link_grabacion}
-            onChange={set('link_grabacion')}
-            placeholder="https://…"
-          />
         </FormField>
       </div>
 

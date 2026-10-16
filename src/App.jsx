@@ -5,7 +5,6 @@ import { Navbar } from './components/ui/Navbar';
 import { supabase } from './lib/supabaseClient';
 import Dashboard     from './pages/Dashboard';
 import Grupos        from './pages/Grupos';
-import Clases        from './pages/Clases';
 import Finanzas      from './pages/Finanzas';
 import Configuracion from './pages/Configuracion';
 import Login         from './pages/Login';
@@ -75,7 +74,6 @@ export default function App() {
                   <Routes>
                     <Route path="/"              element={<Dashboard />} />
                     <Route path="/grupos"        element={<Grupos />} />
-                    <Route path="/clases"        element={<Clases />} />
                     <Route path="/finanzas"      element={<Finanzas />} />
                     <Route path="/configuracion" element={<Configuracion />} />
                   </Routes>

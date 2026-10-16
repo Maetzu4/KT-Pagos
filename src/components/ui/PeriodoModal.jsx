@@ -72,7 +72,7 @@ export function PeriodoModal({ periodo, open, onClose, onUpdate }) {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await onUpdate(periodo.id, {
+      await onUpdate(periodo, {
         pagado_real:   parseFloat(pagadoReal) || 0,
         notas_reclamo: notasReclamo,
       });

@@ -1,33 +1,61 @@
 import { useState } from 'react';
-import { Plus, ExternalLink, MessageCircle, Pencil, Trash2, Search } from 'lucide-react';
+import { Plus, ExternalLink, Pencil, Trash2, Search, SlidersHorizontal } from 'lucide-react';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { Table } from '../components/ui/Table';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
+import { CustomSelect } from '../components/ui/CustomSelect';
 import { GrupoDetailModal } from '../components/ui/GrupoDetailModal';
 import { GrupoForm } from '../components/forms/GrupoForm';
+import { GestionarExtrasModal } from '../components/modals/GestionarExtrasModal';
 import { useGrupos } from '../hooks/useGrupos';
-import { useTarifas } from '../hooks/useTarifas';
-import { formatDate } from '../lib/dateUtils';
-import { formatCurrency } from '../lib/utils';
+
+const ESTADO_OPTIONS = [
+  { value: 'Todos', label: 'Todos' },
+  { value: 'Activo', label: 'Activo' },
+  { value: 'Archivado', label: 'Archivado' },
+];
 
 // ── Vista Principal ────────────────────────────────────────────────────────────
 export default function Grupos() {
   const { grupos, loading, createGrupo, updateGrupo, deleteGrupo } = useGrupos();
-  const { tarifas } = useTarifas();
 
-  const [modal,      setModal]      = useState(null);   // null | 'create' | grupo (para editar)
-  const [detalle,    setDetalle]    = useState(null);   // grupo para modal de detalle
-  const [deleting,   setDeleting]   = useState(null);
-  const [search,     setSearch]     = useState('');
-  const [confirmId,  setConfirmId]  = useState(null);
+  const [modal,              setModal]              = useState(null);   // null | 'create' | grupo (para editar)
+  const [detalle,            setDetalle]            = useState(null);   // grupo para modal de detalle
+  const [deleting,           setDeleting]           = useState(null);
+  const [search,             setSearch]             = useState('');
+  const [filtroEstado,       setFiltroEstado]       = useState('Todos');
+  const [confirmId,          setConfirmId]          = useState(null);
+  const [showGestionExtras,  setShowGestionExtras]  = useState(false);
 
-  const gruposFiltrados = search.trim()
-    ? grupos.filter((g) =>
-        g.nombre_grupo?.toLowerCase().includes(search.trim().toLowerCase())
-      )
-    : grupos;
+  const gruposFiltrados = grupos
+    .filter((g) => {
+      // Filtro por estado
+      if (filtroEstado === 'Activo' && g.estado?.toLowerCase() !== 'activo') {
+        return false;
+      }
+      if (filtroEstado === 'Archivado') {
+        const est = g.estado?.toLowerCase();
+        if (est !== 'archivado' && est !== 'finalizado') {
+          return false;
+        }
+      }
+      // Filtro por búsqueda de texto
+      if (search.trim()) {
+        const q = search.trim().toLowerCase();
+        if (!g.nombre_grupo?.toLowerCase().includes(q)) {
+          return false;
+        }
+      }
+      return true;
+    })
+    .slice()
+    .sort((a, b) => {
+      const fa = a.fecha_inicio_grupo ?? '';
+      const fb = b.fecha_inicio_grupo ?? '';
+      return fa.localeCompare(fb);
+    });
 
   const openCreate = () => setModal('create');
   const openEdit   = (g) => setModal(g);
@@ -47,23 +75,58 @@ export default function Grupos() {
   };
 
   const columns = [
-    { key: 'nombre_grupo', header: 'Nombre' },
+    {
+      key: 'nombre_grupo',
+      header: 'Grupo',
+      render: (r) => (
+        <div className="flex items-center gap-2">
+          <span className="font-medium text-zinc-900 dark:text-white">{r.nombre_grupo ?? '—'}</span>
+          {r.id_externo?.includes('PRM') && (
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold border border-[var(--accent-color)] text-[var(--accent-color)] bg-[var(--accent-color)]/10">
+              PRM
+            </span>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'horario',
+      header: 'Horario',
+      render: (r) => r.horario ?? <span className="text-zinc-400 italic">—</span>,
+    },
     {
       key: 'estado',
       header: 'Estado',
       render: (r) => (
-        <Badge variant={r.estado}>{r.estado === 'activo' ? 'Activo' : r.estado === 'finalizado' ? 'Finalizado' : '—'}</Badge>
+        <Badge variant={r.estado}>
+          {r.estado === 'activo' ? 'Activo'
+            : r.estado === 'finalizado' ? 'Finalizado'
+            : r.estado ?? '—'}
+        </Badge>
       ),
     },
     {
-      key: 'tarifa',
-      header: 'Tarifa',
-      render: (r) => r.tarifas
-        ? `${r.tarifas.duracion_minutos} min`
-        : '—',
+      key: 'lecciones_totales',
+      header: 'Lecciones',
+      render: (r) => r.lecciones_totales ?? <span className="text-zinc-400 italic">—</span>,
     },
-    { key: 'fecha_inicio',       header: 'Inicio',    render: (r) => formatDate(r.fecha_inicio) },
-    { key: 'cantidad_lecciones', header: 'Lecciones' },
+    {
+      key: 'link_bo',
+      header: 'Enlace',
+      render: (r) => r.link_bo
+        ? (
+          <a
+            href={r.link_bo}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 text-[var(--accent-color)] hover:underline text-xs"
+            onClick={(e) => e.stopPropagation()}
+          >
+            Ver <ExternalLink size={11} />
+          </a>
+        )
+        : <span className="text-zinc-400 italic">—</span>,
+    },
     {
       key: 'actions',
       header: '',
@@ -96,7 +159,7 @@ export default function Grupos() {
             {gruposFiltrados.length} de {grupos.length} grupos
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           {/* Barra de búsqueda */}
           <div className="relative">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
@@ -108,6 +171,23 @@ export default function Grupos() {
               className="w-52 h-9 pl-9 pr-3 text-sm rounded-lg bg-white dark:bg-white/5 border border-zinc-300 dark:border-white/10 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none focus:border-[var(--accent-color)] focus:ring-1 focus:ring-[var(--accent-color)]/30 transition-all duration-200"
             />
           </div>
+          {/* Filtro por estado */}
+          <div className="w-36">
+            <CustomSelect
+              value={filtroEstado}
+              onChange={setFiltroEstado}
+              options={ESTADO_OPTIONS}
+              placeholder="Estado"
+              className="!h-9"
+            />
+          </div>
+          <Button
+            variant="secondary"
+            onClick={() => setShowGestionExtras(true)}
+            id="btn-gestionar-extras"
+          >
+            <SlidersHorizontal size={15} /> Gestionar Extras
+          </Button>
           <Button onClick={openCreate} id="btn-crear-grupo">
             <Plus size={16} /> Nuevo Grupo
           </Button>
@@ -119,16 +199,26 @@ export default function Grupos() {
         columns={columns}
         data={gruposFiltrados}
         loading={loading}
-        emptyMessage={search ? `Sin resultados para "${search}"` : 'No hay grupos. Crea uno con el botón de arriba.'}
+        emptyMessage={
+          search || filtroEstado !== 'Todos'
+            ? 'Sin resultados para los filtros aplicados'
+            : 'No hay grupos. Crea uno con el botón de arriba.'
+        }
         onRowClick={(g) => setDetalle(g)}
       />
 
-      {/* Modal de detalle (clic en fila) */}
+      {/* Modal de detalle de clases (clic en fila) */}
       <GrupoDetailModal
         grupo={detalle}
         open={!!detalle}
         onClose={() => setDetalle(null)}
-        onEdit={openEdit}
+        onEdit={(g) => { setDetalle(null); openEdit(g); }}
+      />
+
+      {/* Modal Gestor de Clases Extras */}
+      <GestionarExtrasModal
+        isOpen={showGestionExtras}
+        onClose={() => setShowGestionExtras(false)}
       />
 
       {/* Modal Crear / Editar */}
@@ -139,7 +229,6 @@ export default function Grupos() {
       >
         <GrupoForm
           initial={modal !== 'create' ? modal : undefined}
-          tarifas={tarifas}
           onSubmit={handleSubmit}
           onCancel={closeModal}
         />

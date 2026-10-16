@@ -21,9 +21,17 @@ export function useTarifas() {
   useEffect(() => { fetchTarifas(); }, [fetchTarifas]);
 
   const createTarifa = async (values) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('No hay sesión de usuario activa.');
+
+    const payload = {
+      ...values,
+      user_id: user?.id,
+    };
+
     const { data, error: err } = await supabase
       .from('tarifas')
-      .insert([values])
+      .insert([payload])
       .select()
       .single();
     if (err) throw new Error(err.message);

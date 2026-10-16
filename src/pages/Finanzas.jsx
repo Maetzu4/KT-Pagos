@@ -10,6 +10,7 @@ import { PeriodoModal } from '../components/ui/PeriodoModal';
 import { FormField, Input, Textarea } from '../components/ui/FormField';
 import { CustomSelect } from '../components/ui/CustomSelect';
 import { usePeriodos } from '../hooks/usePeriodos';
+import { useCountUp } from '../hooks/useCountUp';
 import { formatCurrency } from '../lib/utils';
 import { formatDate } from '../lib/dateUtils';
 
@@ -87,18 +88,18 @@ function PeriodoRow({ periodo, onClick }) {
 
 // ── Vista Principal ────────────────────────────────────────────────────────────
 export default function Finanzas() {
-  const { periodos, loading, updatePeriodo } = usePeriodos();
+  const { periodos, loading, updatePeriodo, metricas } = usePeriodos();
 
   const [selectedPeriodo, setSelectedPeriodo] = useState(null);
   const [search, setSearch] = useState('');
   const [filtroAnio, setFiltroAnio] = useState('');
   const [filtroMes, setFiltroMes] = useState('');
 
-  // Totales globales
-  const totalEstimado = periodos.reduce((s, p) => s + (p.total_a_cobrar ?? p.estimado_real ?? 0), 0);
-  const totalPagado = periodos.reduce((s, p) => s + (p.pagado_real ?? 0), 0);
-  const totalDeuda = periodos.reduce((s, p) => s + (p.deuda_reclamos ?? 0), 0);
-  const totalRollover = periodos.reduce((s, p) => s + (p.deuda_anterior ?? 0), 0);
+  // Totales animados a partir del objeto metricas retornado por usePeriodos
+  const animEstimado = useCountUp(metricas?.totalEstimado ?? 0);
+  const animPagado = useCountUp(metricas?.totalCobrado ?? metricas?.totalPagado ?? 0);
+  const animDeuda = useCountUp(metricas?.totalDeuda ?? 0);
+  const animRollover = useCountUp(metricas?.totalRollover ?? 0);
 
   // ── Opciones de filtros Año y Mes ─────────────────────────────────
   const aniosDisponibles = useMemo(() => {
@@ -155,26 +156,26 @@ export default function Finanzas() {
         <p className="text-sm text-zinc-500 mt-1">Cortes mensuales y seguimiento de pagos</p>
       </div>
 
-      {/* ── Totales globales — MetricCards uniformes ── */}
+      {/* ── Totales globales — MetricCards uniformes con animación ── */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <MetricCard
           label="Total Estimado"
-          value={formatCurrency(totalEstimado)}
+          value={formatCurrency(animEstimado)}
           icon={TrendingUp}
         />
         <MetricCard
           label="Total Pagado"
-          value={formatCurrency(totalPagado)}
+          value={formatCurrency(animPagado)}
           icon={DollarSign}
         />
         <MetricCard
           label="Total Reclamos"
-          value={formatCurrency(totalDeuda)}
+          value={formatCurrency(animDeuda)}
           icon={AlertTriangle}
         />
         <MetricCard
           label="Total Arrastrado"
-          value={formatCurrency(totalRollover)}
+          value={formatCurrency(animRollover)}
           icon={RotateCcw}
         />
       </div>
@@ -240,8 +241,8 @@ export default function Finanzas() {
           {hayFiltros
             ? <p>Sin periodos que coincidan con los filtros.</p>
             : <>
-              <p>No hay periodos registrados aún.</p>
-              <p className="text-sm mt-1">Se crean automáticamente al registrar clases.</p>
+              <p>No hay periodos con clases completadas aún.</p>
+              <p className="text-sm mt-1">Los periodos se generan automáticamente cuando las clases pasan a estado Completada.</p>
             </>
           }
         </div>
@@ -249,7 +250,7 @@ export default function Finanzas() {
         <div className="space-y-2">
           {periodosFiltrados.map((p) => (
             <PeriodoRow
-              key={p.id}
+              key={p.key_periodo}
               periodo={p}
               onClick={() => setSelectedPeriodo(p)}
             />
@@ -262,8 +263,8 @@ export default function Finanzas() {
         periodo={selectedPeriodo}
         open={!!selectedPeriodo}
         onClose={() => setSelectedPeriodo(null)}
-        onUpdate={async (id, values) => {
-          await updatePeriodo(id, values);
+        onUpdate={async (targetPeriodo, values) => {
+          await updatePeriodo(targetPeriodo, values);
           setSelectedPeriodo(null);
         }}
       />

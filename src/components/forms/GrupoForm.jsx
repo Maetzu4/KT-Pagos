@@ -1,45 +1,44 @@
 import { useState, useEffect } from 'react';
+import { AlertTriangle } from 'lucide-react';
 import { FormField, Input } from '../ui/FormField';
-import { CustomSelect } from '../ui/CustomSelect';
 import { Button } from '../ui/Button';
 
 const DEFAULT = {
-  nombre_grupo: '',
-  tarifa_id: '',
-  link_backoffice: '',
-  link_whatsapp: '',
-  fecha_inicio: '',
-  cantidad_lecciones: '',
+  nombre_grupo:      '',
+  curso_nombre:      '',
+  curso_codigo:      '',
+  fecha_inicio_grupo: '',
+  horario:           '',
+  lecciones_totales: '',
+  duracion_minutos:  '',
+  link_bo:           '',
 };
 
 function getInitialState(initial) {
+  if (!initial) return DEFAULT;
   return {
-    ...DEFAULT,
-    ...initial,
-    tarifa_id: initial?.tarifa_id != null ? String(initial.tarifa_id) : (initial?.tarifas?.id != null ? String(initial.tarifas.id) : ''),
-    nombre_grupo: initial?.nombre_grupo ?? '',
-    fecha_inicio: initial?.fecha_inicio ?? '',
-    cantidad_lecciones: initial?.cantidad_lecciones != null ? String(initial.cantidad_lecciones) : '',
-    link_backoffice: initial?.link_backoffice ?? '',
-    link_whatsapp: initial?.link_whatsapp ?? '',
+    nombre_grupo:       initial.nombre_grupo       ?? '',
+    curso_nombre:       initial.curso_nombre        ?? '',
+    curso_codigo:       initial.curso_codigo        ?? '',
+    fecha_inicio_grupo: initial.fecha_inicio_grupo
+      ? initial.fecha_inicio_grupo.split('T')[0].split(' ')[0]
+      : '',
+    horario:            initial.horario             ?? '',
+    lecciones_totales:  initial.lecciones_totales   != null ? String(initial.lecciones_totales) : '',
+    duracion_minutos:   initial.duracion_minutos     != null ? String(initial.duracion_minutos)  : '',
+    link_bo:            initial.link_bo             ?? '',
   };
 }
 
-export function GrupoForm({ initial, tarifas = [], onSubmit, onCancel }) {
-  const [form, setForm] = useState(() => getInitialState(initial));
+export function GrupoForm({ initial, onSubmit, onCancel }) {
+  const isEditing = !!initial?.id;
+  const [form,   setForm]   = useState(() => getInitialState(initial));
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
+  const [error,  setError]  = useState('');
 
-  useEffect(() => {
-    setForm(getInitialState(initial));
-  }, [initial]);
+  useEffect(() => { setForm(getInitialState(initial)); }, [initial]);
 
   const set = (k) => (e) => setForm((p) => ({ ...p, [k]: e.target.value }));
-
-  const handleTarifaChange = (e) => {
-    const val = e.target.value;
-    setForm((p) => ({ ...p, tarifa_id: val }));
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -47,40 +46,28 @@ export function GrupoForm({ initial, tarifas = [], onSubmit, onCancel }) {
       setError('El nombre del grupo es obligatorio.');
       return;
     }
-    if (!form.tarifa_id || form.tarifa_id === '') {
-      setError('Por favor selecciona una tarifa.');
-      return;
-    }
-    if (!form.fecha_inicio) {
+    if (!form.fecha_inicio_grupo) {
       setError('La fecha de inicio es obligatoria.');
       return;
     }
-    if (!form.cantidad_lecciones || Number(form.cantidad_lecciones) <= 0) {
-      setError('Ingresa una cantidad válida de lecciones.');
-      return;
-    }
-
     setSaving(true);
     setError('');
-
-    // Resolver tarifa_id correctamente: integer vs UUID
-    const rawTarifaId = String(form.tarifa_id).trim();
-    const isPureDigits = /^\d+$/.test(rawTarifaId);
-    const resolvedTarifaId = isPureDigits ? Number(rawTarifaId) : rawTarifaId;
-
     const payload = {
-      nombre_grupo: form.nombre_grupo.trim(),
-      tarifa_id: resolvedTarifaId,
-      fecha_inicio: form.fecha_inicio,
-      cantidad_lecciones: Number(form.cantidad_lecciones),
-      link_backoffice: form.link_backoffice?.trim() || null,
-      link_whatsapp: form.link_whatsapp?.trim() || null,
+      nombre_grupo:       form.nombre_grupo.trim(),
+      curso_nombre:       form.curso_nombre.trim()   || null,
+      curso_codigo:       form.curso_codigo.trim()   || null,
+      fecha_inicio_grupo: form.fecha_inicio_grupo    || null,
+      horario:            form.horario.trim()        || null,
+      lecciones_totales:  form.lecciones_totales !== '' ? Number(form.lecciones_totales) : null,
+      duracion_minutos:   form.duracion_minutos  !== '' ? Number(form.duracion_minutos)  : null,
+      link_bo:            form.link_bo.trim()        || null,
+      user_id:            initial?.user_id ?? null,
     };
-
     try {
       await onSubmit(payload);
     } catch (err) {
-      setError(err.message || 'Error al guardar el grupo');
+      console.error('Error al guardar grupo:', err);
+      setError(err?.message || 'Error al guardar el grupo');
     } finally {
       setSaving(false);
     }
@@ -88,81 +75,107 @@ export function GrupoForm({ initial, tarifas = [], onSubmit, onCancel }) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+
+      {/* Advertencia de edición */}
+      {isEditing && (
+        <div className="flex items-start gap-2.5 px-3 py-2.5 rounded-xl
+                        bg-[var(--accent-color)]/10 border border-[var(--accent-color)]/25
+                        text-[var(--accent-color)]">
+          <AlertTriangle size={15} className="shrink-0 mt-0.5 text-[var(--accent-color)]" />
+          <p className="text-xs leading-relaxed text-[var(--accent-color)]">
+            <span className="font-semibold text-[var(--accent-color)]">Atención:</span> Modificar la Fecha de Inicio o las Lecciones
+            recalculará todas las clases futuras.
+          </p>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
         <FormField label="Nombre del Grupo" required className="md:col-span-2">
           <Input
             id="nombre_grupo"
             value={form.nombre_grupo}
             onChange={set('nombre_grupo')}
-            placeholder="Ej. Grupo Inglés A1 — Lunes"
+            placeholder="Ej. MC LVL2 #12345"
           />
         </FormField>
 
-        <FormField label="Tarifa" required>
-          <CustomSelect
-            id="tarifa_id"
-            value={form.tarifa_id ? String(form.tarifa_id) : ''}
-            onChange={(val) => setForm((p) => ({ ...p, tarifa_id: val }))}
-            options={tarifas.map((t) => {
-              const tid = t.id ?? t.tarifa_id;
-              return {
-                value: String(tid),
-                label: `${t.duracion_minutos} min — $${t.precio_regular} / $${t.precio_extra} extra`,
-              };
-            })}
-            placeholder="Selecciona tarifa…"
+        <FormField label="Curso (Nombre)">
+          <Input
+            id="curso_nombre"
+            value={form.curso_nombre}
+            onChange={set('curso_nombre')}
+            placeholder="Ej. Minecraft Education LVL2"
+          />
+        </FormField>
+
+        <FormField label="Curso (Código)">
+          <Input
+            id="curso_codigo"
+            value={form.curso_codigo}
+            onChange={set('curso_codigo')}
+            placeholder="Ej. MC-LVL2"
           />
         </FormField>
 
         <FormField label="Fecha de Inicio" required>
           <Input
-            id="fecha_inicio"
+            id="fecha_inicio_grupo"
             type="date"
-            value={form.fecha_inicio}
-            onChange={set('fecha_inicio')}
+            value={form.fecha_inicio_grupo}
+            onChange={set('fecha_inicio_grupo')}
           />
         </FormField>
 
-        <FormField label="Cantidad de Lecciones" required className="md:col-span-2">
+        <FormField label="Horario">
           <Input
-            id="cantidad_lecciones"
+            id="horario"
+            value={form.horario}
+            onChange={set('horario')}
+            placeholder="Ej. Do 12:00"
+          />
+        </FormField>
+
+        <FormField label="Lecciones Totales">
+          <Input
+            id="lecciones_totales"
             type="number"
-            min="1"
-            value={form.cantidad_lecciones}
-            onChange={set('cantidad_lecciones')}
+            min="0"
+            value={form.lecciones_totales}
+            onChange={set('lecciones_totales')}
             placeholder="Ej. 24"
           />
         </FormField>
 
-        <FormField label="Link Backoffice">
+        <FormField label="Duración (minutos)">
           <Input
-            id="link_backoffice"
+            id="duracion_minutos"
+            type="number"
+            min="1"
+            value={form.duracion_minutos}
+            onChange={set('duracion_minutos')}
+            placeholder="Ej. 60"
+          />
+        </FormField>
+
+        <FormField label="Link Backoffice" className="md:col-span-2">
+          <Input
+            id="link_bo"
             type="url"
-            value={form.link_backoffice}
-            onChange={set('link_backoffice')}
+            value={form.link_bo}
+            onChange={set('link_bo')}
             placeholder="https://…"
           />
         </FormField>
 
-        <FormField label="Link WhatsApp">
-          <Input
-            id="link_whatsapp"
-            type="url"
-            value={form.link_whatsapp}
-            onChange={set('link_whatsapp')}
-            placeholder="https://wa.me/…"
-          />
-        </FormField>
       </div>
 
       {error && <p className="text-sm text-red-400">{error}</p>}
 
       <div className="flex justify-end gap-3 pt-2">
-        <Button type="button" variant="ghost" onClick={onCancel}>
-          Cancelar
-        </Button>
+        <Button type="button" variant="ghost" onClick={onCancel}>Cancelar</Button>
         <Button type="submit" loading={saving}>
-          {initial?.id ? 'Guardar cambios' : 'Crear grupo'}
+          {isEditing ? 'Guardar cambios' : 'Crear grupo'}
         </Button>
       </div>
     </form>

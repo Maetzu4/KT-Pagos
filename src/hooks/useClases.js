@@ -11,33 +11,53 @@ export function useClases(filtros = {}) {
     setError(null);
     let query = supabase
       .from('clases')
-      .select(`*, grupos(nombre_grupo, tarifa_id, tarifas(*)), periodos(nombre_periodo)`)
+      .select(`*, grupos(nombre_grupo, tarifa_id, tarifas(*))`)
       .order('fecha_clase', { ascending: false });
 
     if (filtros.grupo_id) query = query.eq('grupo_id', filtros.grupo_id);
-    if (filtros.periodo_id) query = query.eq('periodo_id', filtros.periodo_id);
+    if (filtros.fecha_inicio) query = query.gte('fecha_clase', filtros.fecha_inicio);
+    if (filtros.fecha_fin) query = query.lte('fecha_clase', filtros.fecha_fin);
+    if (filtros.periodo_id && !String(filtros.periodo_id).startsWith('virtual-')) {
+      query = query.eq('periodo_id', filtros.periodo_id);
+    }
 
     const { data, error: err } = await query;
     if (err) { setError(err.message); setLoading(false); return; }
     setClases(data || []);
     setLoading(false);
-  }, [filtros.grupo_id, filtros.periodo_id]);
+  }, [filtros.grupo_id, filtros.fecha_inicio, filtros.fecha_fin, filtros.periodo_id]);
 
   useEffect(() => { fetchClases(); }, [fetchClases]);
 
   /**
    * Crea una clase aplicando el Motor de Precios (Snapshot):
-   * Lee la tarifa del grupo y asigna precio_cobrado según es_extra.
-   * Requiere que getOrCreatePeriodo sea pasado desde usePeriodos.
+   * Lee la tarifa del grupo y asigna precio_cobrado según es_adicional.
    */
-  const createClase = async (values, getOrCreatePeriodo) => {
-    const { grupo_id, fecha_clase, es_extra, recalc, ...rest } = values;
+  const createClase = async (values) => {
+    const {
+      grupo_id,
+      fecha_clase,
+      es_adicional,
+      es_extra,
+      nombre_clase,
+      tema_clase,
+      estado_clase,
+      en_reclamo,
+      recalc,
+      ...rest
+    } = values;
+
+    const isAdicional = Boolean(es_adicional ?? es_extra);
 
     // 1. Obtener tarifa del grupo
+    const rawGrupoId = String(grupo_id || '').trim();
+    const isPureDigits = /^\d+$/.test(rawGrupoId);
+    const resolvedGrupoId = isPureDigits ? Number(rawGrupoId) : rawGrupoId;
+
     const { data: grupo, error: gErr } = await supabase
       .from('grupos')
       .select(`tarifa_id, tarifas(precio_regular, precio_extra)`)
-      .eq('id', grupo_id)
+      .eq('id', resolvedGrupoId)
       .single();
     if (gErr) throw new Error(gErr.message);
 
@@ -45,32 +65,48 @@ export function useClases(filtros = {}) {
     if (!tarifa) throw new Error('El grupo no tiene tarifa asociada.');
 
     // Motor de precios: snapshot inmutable
-    const precio_cobrado = es_extra ? tarifa.precio_extra : tarifa.precio_regular;
+    const precio_cobrado = isAdicional ? tarifa.precio_extra : tarifa.precio_regular;
 
-    // 2. Obtener o crear el periodo del mes
-    const periodo = await getOrCreatePeriodo(fecha_clase);
+    const { data: { user } } = await supabase.auth.getUser();
 
-    // 3. Insertar la clase
+    const insertPayload = {
+      grupo_id: resolvedGrupoId,
+      user_id: user?.id ?? null,
+      fecha_clase,
+      nombre_clase: nombre_clase || tema_clase || null,
+      tema_clase: tema_clase || nombre_clase || null,
+      estado_clase: estado_clase || 'Programada',
+      es_adicional: isAdicional,
+      en_reclamo: Boolean(en_reclamo),
+      precio_cobrado,
+      periodo_id: null,
+    };
+
+    // 2. Insertar la clase
     const { data, error: err } = await supabase
       .from('clases')
-      .insert([{ grupo_id, fecha_clase, es_extra, precio_cobrado, periodo_id: periodo.id, ...rest }])
-      .select(`*, grupos(nombre_grupo, tarifas(*)), periodos(nombre_periodo)`)
+      .insert([insertPayload])
+      .select(`*, grupos(nombre_grupo, tarifas(*))`)
       .single();
     if (err) throw new Error(err.message);
     setClases((prev) => [data, ...prev]);
     return data;
   };
 
-  const updateClase = async (id, values, getOrCreatePeriodo = null) => {
+  const updateClase = async (id, values) => {
     // ── Snapshot Preservation ──
     // Si el payload incluye recalc: true, recalculamos el precio.
     // De lo contrario, respetamos el precio_cobrado existente y simplemente actualizamos.
-    const { recalc, ...cleanValues } = values;
+    const { recalc, es_extra, ...cleanValues } = values;
 
-    let finalValues = cleanValues;
+    if (es_extra !== undefined && cleanValues.es_adicional === undefined) {
+      cleanValues.es_adicional = Boolean(es_extra);
+    }
+
+    let finalValues = { ...cleanValues };
 
     if (recalc) {
-      // El usuario cambió grupo_id o es_extra → recalcular precio snapshot
+      // El usuario cambió grupo_id o es_adicional → recalcular precio snapshot
       const rawGrupoId = String(cleanValues.grupo_id || '').trim();
       const isPureDigits = /^\d+$/.test(rawGrupoId);
       const resolvedGrupoId = isPureDigits ? Number(rawGrupoId) : rawGrupoId;
@@ -85,26 +121,39 @@ export function useClases(filtros = {}) {
       const tarifa = grupo?.tarifas;
       if (!tarifa) throw new Error('El grupo no tiene tarifa asociada.');
 
-      const precio_cobrado = cleanValues.es_extra
+      const precio_cobrado = cleanValues.es_adicional
         ? tarifa.precio_extra
         : tarifa.precio_regular;
 
-      finalValues = { ...cleanValues, precio_cobrado };
+      finalValues.precio_cobrado = precio_cobrado;
     }
 
-    if (cleanValues.fecha_clase && getOrCreatePeriodo) {
-      const originalClase = clases.find(c => c.id === id);
-      if (originalClase && originalClase.fecha_clase !== cleanValues.fecha_clase) {
-        const periodo = await getOrCreatePeriodo(cleanValues.fecha_clase);
-        finalValues.periodo_id = periodo.id;
+    // Filtrar estrictamente columnas que existen en la tabla clases V2
+    const ALLOWED_COLUMNS = new Set([
+      'fecha_clase',
+      'estado_clase',
+      'precio_cobrado',
+      'en_reclamo',
+      'tema_clase',
+      'nombre_clase',
+      'es_adicional',
+      'grupo_id',
+      'periodo_id',
+      'user_id',
+    ]);
+
+    const sanitizedPayload = {};
+    for (const [key, val] of Object.entries(finalValues)) {
+      if (ALLOWED_COLUMNS.has(key)) {
+        sanitizedPayload[key] = val;
       }
     }
 
     const { data, error: err } = await supabase
       .from('clases')
-      .update(finalValues)
+      .update(sanitizedPayload)
       .eq('id', id)
-      .select(`*, grupos(nombre_grupo, tarifas(*)), periodos(nombre_periodo)`)
+      .select(`*, grupos(nombre_grupo, tarifas(*))`)
       .single();
     if (err) throw new Error(err.message);
     setClases((prev) => prev.map((c) => (c.id === id ? data : c)));

@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Plus, Pencil, Trash2, Sun, Moon, LogOut, Heart } from 'lucide-react';
+import { Plus, Pencil, Trash2, Sun, Moon, LogOut, Heart, Database } from 'lucide-react';
+import { ImportadorJSON } from '../components/ImportadorJSON';
 import { supabase } from '../lib/supabaseClient';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -97,6 +98,7 @@ export default function Configuracion() {
   const [confirmId, setConfirmId] = useState(null);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [isDonationModalOpen, setIsDonationModalOpen] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
 
   const handleSubmit = async (values) => {
     if (modal === 'create') await createTarifa(values);
@@ -180,6 +182,32 @@ export default function Configuracion() {
         </div>
       </Card>
 
+      {/* ── Importar Datos ── */}
+      <Card>
+        <div className="flex items-center justify-between mb-2">
+          <div>
+            <h2 className="text-sm font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider">
+              Importar Datos
+            </h2>
+            <p className="text-xs text-zinc-500 mt-0.5">
+              Sincroniza grupos desde un archivo JSON y genera las clases automáticamente.
+            </p>
+          </div>
+        </div>
+        <button
+          id="btn-abrir-importador"
+          onClick={() => setShowImportModal(true)}
+          className="mt-3 w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl
+                     bg-[var(--accent-color)] text-white border border-transparent
+                     hover:bg-transparent hover:text-[var(--accent-color)] hover:border-[var(--accent-color)]
+                     outline-none focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/30
+                     font-semibold text-sm transition-all duration-200 group"
+        >
+          <Database size={16} className="transition-transform duration-200 group-hover:scale-110" />
+          Importar datos en JSON
+        </button>
+      </Card>
+
       {/* ── Tarifas ── */}
       <Card>
         <div className="flex items-center justify-between mb-5">
@@ -255,7 +283,17 @@ export default function Configuracion() {
         </Button>
       </div>
 
-      {/* ── Modal Tarifa ── */}
+      {/* Modal Importador */}
+      <Modal
+        open={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        title="Importar Grupos"
+        size="full"
+      >
+        <ImportadorJSON />
+      </Modal>
+
+      {/* Modal Tarifa */}
       <Modal
         open={!!modal}
         onClose={() => setModal(null)}
