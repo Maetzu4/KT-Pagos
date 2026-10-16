@@ -115,8 +115,8 @@ export function GestionarExtrasModal({ isOpen, onClose }) {
             </div>
           ) : (
             <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden bg-white dark:bg-zinc-900">
-              <div className="max-h-[50vh] overflow-y-auto">
-                <table className="min-w-full text-sm">
+              <div className="max-h-[50vh] overflow-y-auto overflow-x-auto">
+                <table className="min-w-[500px] w-full text-sm">
                   <thead className="sticky top-0 z-10 bg-zinc-50 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800">
                     <tr>
                       <th className="px-4 py-3 text-left text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">

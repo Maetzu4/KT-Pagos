@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Plus, Pencil, Trash2, Sun, Moon, LogOut, Heart, Database } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { Plus, Pencil, Trash2, Sun, Moon, LogOut, Heart, Database, Download, Upload } from 'lucide-react';
 import { ImportadorJSON } from '../components/ImportadorJSON';
 import { supabase } from '../lib/supabaseClient';
 import { Card } from '../components/ui/Card';
@@ -100,6 +100,14 @@ export default function Configuracion() {
   const [isDonationModalOpen, setIsDonationModalOpen] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
 
+  // Estados de Respaldo y Zona de Peligro
+  const [exporting, setExporting] = useState(false);
+  const [importingBackup, setImportingBackup] = useState(false);
+  const [showDangerModal, setShowDangerModal] = useState(false);
+  const [confirmDeleteText, setConfirmDeleteText] = useState('');
+  const [deletingAll, setDeletingAll] = useState(false);
+  const fileInputRef = useRef(null);
+
   const handleSubmit = async (values) => {
     if (modal === 'create') await createTarifa(values);
     else await updateTarifa(modal.id, values);
@@ -116,6 +124,181 @@ export default function Configuracion() {
   const copiarCorreo = () => {
     navigator.clipboard.writeText('6814natsu@gmail.com');
     alert('¡Correo copiado al portapapeles!');
+  };
+
+  // ── Sistema de Backup ────────────────────────────────────────────────────────
+  const handleDownloadBackup = async () => {
+    setExporting(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('No hay sesión de usuario activa.');
+
+      const [
+        { data: tarifasData, error: errT },
+        { data: gruposData, error: errG },
+        { data: periodosData, error: errP },
+        { data: clasesData, error: errC },
+      ] = await Promise.all([
+        supabase.from('tarifas').select('*').eq('user_id', user.id),
+        supabase.from('grupos').select('*').eq('user_id', user.id),
+        supabase.from('periodos').select('*').eq('user_id', user.id),
+        supabase.from('clases').select('*').eq('user_id', user.id),
+      ]);
+
+      if (errT) throw new Error(`Error en tarifas: ${errT.message}`);
+      if (errG) throw new Error(`Error en grupos: ${errG.message}`);
+      if (errP) throw new Error(`Error en periodos: ${errP.message}`);
+      if (errC) throw new Error(`Error en clases: ${errC.message}`);
+
+      const backupObj = {
+        version: 2,
+        fecha: new Date().toISOString(),
+        user_id: user.id,
+        tarifas: tarifasData || [],
+        grupos: gruposData || [],
+        periodos: periodosData || [],
+        clases: clasesData || [],
+      };
+
+      const blob = new Blob([JSON.stringify(backupObj, null, 2)], {
+        type: 'application/json',
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'kt-pagos-backup.json';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Error al exportar backup:', err);
+      alert('Error al descargar el backup: ' + (err.message || 'Error desconocido'));
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleRestoreBackup = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImportingBackup(true);
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('No hay sesión de usuario activa.');
+
+      // Inserción estricta en orden para evitar errores de llaves foráneas:
+      // 1º Tarifas
+      if (Array.isArray(data.tarifas) && data.tarifas.length > 0) {
+        const cleanTarifas = data.tarifas.map((t) => ({
+          ...t,
+          user_id: user.id,
+        }));
+        const { error: tErr } = await supabase.from('tarifas').upsert(cleanTarifas);
+        if (tErr) throw new Error(`Error al restaurar tarifas: ${tErr.message}`);
+      }
+
+      // 2º Grupos
+      if (Array.isArray(data.grupos) && data.grupos.length > 0) {
+        const cleanGrupos = data.grupos.map((g) => {
+          const { tarifas: _t, clases: _c, ...rest } = g;
+          return {
+            ...rest,
+            user_id: user.id,
+          };
+        });
+        const { error: gErr } = await supabase.from('grupos').upsert(cleanGrupos);
+        if (gErr) throw new Error(`Error al restaurar grupos: ${gErr.message}`);
+      }
+
+      // 3º Periodos
+      if (Array.isArray(data.periodos) && data.periodos.length > 0) {
+        const cleanPeriodos = data.periodos.map((p) => {
+          const { clases: _c, ...rest } = p;
+          return {
+            ...rest,
+            user_id: user.id,
+          };
+        });
+        const { error: pErr } = await supabase.from('periodos').upsert(cleanPeriodos);
+        if (pErr) throw new Error(`Error al restaurar periodos: ${pErr.message}`);
+      }
+
+      // 4º Clases
+      if (Array.isArray(data.clases) && data.clases.length > 0) {
+        const cleanClases = data.clases.map((c) => {
+          const { grupos: _g, periodos: _p, ...rest } = c;
+          return {
+            ...rest,
+            user_id: user.id,
+          };
+        });
+        // Upsert en lotes para garantizar estabilidad
+        for (let i = 0; i < cleanClases.length; i += 100) {
+          const chunk = cleanClases.slice(i, i + 100);
+          const { error: cErr } = await supabase.from('clases').upsert(chunk);
+          if (cErr) throw new Error(`Error al restaurar clases (lote ${i / 100 + 1}): ${cErr.message}`);
+        }
+      }
+
+      alert('¡Respaldo restaurado con éxito!');
+      window.location.reload();
+    } catch (err) {
+      console.error('Error al restaurar backup:', err);
+      alert('Error al restaurar el respaldo: ' + (err.message || 'Archivo inválido'));
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      setImportingBackup(false);
+    }
+  };
+
+  // ── Zona de Peligro (Borrado Total) ───────────────────────────────────────────
+  const handleDeleteAllData = async () => {
+    if (confirmDeleteText !== 'CONFIRMO') return;
+    setDeletingAll(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('No hay sesión de usuario activa.');
+
+      // Orden estricto: clases → grupos → periodos → tarifas
+      const { error: errClases } = await supabase
+        .from('clases')
+        .delete()
+        .eq('user_id', user.id);
+      if (errClases) throw new Error(`Error al eliminar clases: ${errClases.message}`);
+
+      const { error: errGrupos } = await supabase
+        .from('grupos')
+        .delete()
+        .eq('user_id', user.id);
+      if (errGrupos) throw new Error(`Error al eliminar grupos: ${errGrupos.message}`);
+
+      const { error: errPeriodos } = await supabase
+        .from('periodos')
+        .delete()
+        .eq('user_id', user.id);
+      if (errPeriodos) throw new Error(`Error al eliminar periodos: ${errPeriodos.message}`);
+
+      const { error: errTarifas } = await supabase
+        .from('tarifas')
+        .delete()
+        .eq('user_id', user.id);
+      if (errTarifas) throw new Error(`Error al eliminar tarifas: ${errTarifas.message}`);
+
+      alert('Todos tus datos han sido eliminados correctamente.');
+      setShowDangerModal(false);
+      setConfirmDeleteText('');
+      window.location.reload();
+    } catch (err) {
+      console.error('Error al borrar todos los datos:', err);
+      alert('Error durante el borrado masivo: ' + (err.message || 'Error desconocido'));
+    } finally {
+      setDeletingAll(false);
+    }
   };
 
   const columns = [
@@ -208,6 +391,50 @@ export default function Configuracion() {
         </button>
       </Card>
 
+      {/* ── Respaldo de Datos ── */}
+      <Card>
+        <div className="flex items-center justify-between mb-2">
+          <div>
+            <h2 className="text-sm font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider">
+              Respaldo de Datos
+            </h2>
+            <p className="text-xs text-zinc-500 mt-0.5">
+              Descarga una copia completa en JSON o restaura un respaldo previo de tus datos.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Button
+            onClick={handleDownloadBackup}
+            loading={exporting}
+            id="btn-descargar-backup"
+            className="w-full flex items-center justify-center gap-2 py-3 border border-[var(--accent-color)] text-[var(--accent-color)] bg-transparent hover:bg-[var(--accent-color)]/10 font-semibold text-sm transition-all duration-200"
+          >
+            <Download size={16} /> Descargar Backup
+          </Button>
+
+          <div>
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleRestoreBackup}
+              accept=".json,application/json"
+              className="hidden"
+              id="input-restaurar-backup"
+            />
+            <Button
+              onClick={() => fileInputRef.current?.click()}
+              loading={importingBackup}
+              id="btn-restaurar-backup"
+              className="w-full flex items-center justify-center gap-2 py-3 bg-[var(--accent-color)] text-white hover:opacity-90 font-semibold text-sm transition-all duration-200"
+            >
+              <Upload size={16} /> Restaurar Backup
+            </Button>
+          </div>
+        </div>
+      </Card>
+
       {/* ── Tarifas ── */}
       <Card>
         <div className="flex items-center justify-between mb-5">
@@ -238,6 +465,32 @@ export default function Configuracion() {
         >
           ¿Quieres apoyar este proyecto? Haz clic aquí ☕
         </button>
+      </Card>
+
+      {/* ── Zona de Peligro ── */}
+      <Card>
+        <div className="flex items-center justify-between mb-2">
+          <div>
+            <h2 className="text-sm font-semibold text-[var(--accent-color)] uppercase tracking-wider">
+              Zona de Peligro
+            </h2>
+            <p className="text-xs text-zinc-500 mt-0.5">
+              Elimina de forma irreversible todas tus clases, grupos, periodos y tarifas asociadas a tu cuenta.
+            </p>
+          </div>
+        </div>
+        <div className="mt-4">
+          <Button
+            onClick={() => {
+              setConfirmDeleteText('');
+              setShowDangerModal(true);
+            }}
+            id="btn-borrar-todos-datos"
+            className="w-full flex items-center justify-center gap-2 py-3 border border-[var(--accent-color)] text-[var(--accent-color)] bg-transparent hover:bg-[var(--accent-color)]/10 font-semibold text-sm transition-all duration-200"
+          >
+            <Trash2 size={16} /> Borrar todos mis datos
+          </Button>
+        </div>
       </Card>
 
       <Modal open={isDonationModalOpen} onClose={() => setIsDonationModalOpen(false)} title="Apoyar el proyecto">
@@ -328,6 +581,63 @@ export default function Configuracion() {
         onCancel={() => setShowLogoutConfirm(false)}
         destructive
       />
+
+      {/* Modal Confirmación Borrado Total (Zona de Peligro) */}
+      <Modal
+        open={showDangerModal}
+        onClose={() => {
+          if (!deletingAll) {
+            setShowDangerModal(false);
+            setConfirmDeleteText('');
+          }
+        }}
+        title="Zona de Peligro"
+        size="sm"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-zinc-600 dark:text-zinc-300">
+            Esta acción es irreversible y eliminará permanentemente todas tus <strong>clases</strong>, <strong>grupos</strong>, <strong>periodos</strong> y <strong>tarifas</strong> asociadas a tu cuenta.
+          </p>
+
+          <div>
+            <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">
+              Para confirmar, escribe <strong className="text-[var(--accent-color)] font-mono">CONFIRMO</strong> en el recuadro:
+            </label>
+            <input
+              type="text"
+              value={confirmDeleteText}
+              onChange={(e) => setConfirmDeleteText(e.target.value)}
+              placeholder="CONFIRMO"
+              disabled={deletingAll}
+              className="w-full h-10 px-3 text-sm rounded-lg bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:outline-none focus:border-[var(--accent-color)] focus:ring-1 focus:ring-[var(--accent-color)]/30 font-mono"
+            />
+          </div>
+
+          <div className="flex justify-end gap-3 pt-3 border-t border-zinc-200 dark:border-zinc-800">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                setShowDangerModal(false);
+                setConfirmDeleteText('');
+              }}
+              disabled={deletingAll}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              onClick={handleDeleteAllData}
+              disabled={confirmDeleteText !== 'CONFIRMO' || deletingAll}
+              loading={deletingAll}
+              id="btn-confirmar-borrado-total"
+              className="bg-[var(--accent-color)] text-white hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed font-semibold text-sm"
+            >
+              Borrar definitivamente
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
