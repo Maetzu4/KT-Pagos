@@ -23,8 +23,10 @@ import { formatCurrency } from '../lib/utils';
  * Precio efectivo de una clase.
  * Si precio_cobrado está seteado lo usa; si no, cae al precio_regular de la tarifa del grupo.
  */
-const getPrecio = (c) =>
-  Number(c.precio_cobrado ?? c.grupos?.tarifas?.precio_regular ?? 0);
+const getPrecio = (c) => {
+  if (c?.estado_clase === 'Cancelada') return 0;
+  return Number(c?.precio_cobrado ?? c?.grupos?.tarifas?.precio_regular ?? 0);
+};
 
 /** Formatea 'YYYY-MM-DD' → 'DD/MM/YYYY' */
 function fmtFecha(str) {
@@ -103,6 +105,21 @@ export default function Dashboard() {
       await refetchClases?.();
     } catch (err) {
       console.error('Error al actualizar estado de clase:', err);
+    } finally {
+      setUpdatingClase(null);
+    }
+  };
+
+  const handleAplazarClase = async (c) => {
+    const nuevaFecha = window.prompt('Introduce la nueva fecha (YYYY-MM-DD):', c.fecha_clase);
+    if (!nuevaFecha || !nuevaFecha.trim()) return;
+
+    setUpdatingClase(`${c.id}-Aplazada`);
+    try {
+      await updateClase(c.id, { fecha_clase: nuevaFecha.trim(), estado_clase: 'Programada' });
+      await refetchClases?.();
+    } catch (err) {
+      console.error('Error al aplazar clase:', err);
     } finally {
       setUpdatingClase(null);
     }
@@ -376,7 +393,7 @@ export default function Dashboard() {
                     <button
                       type="button"
                       disabled={!!updatingClase}
-                      onClick={() => handleCambiarEstado(c.id, 'Aplazada')}
+                      onClick={() => handleAplazarClase(c)}
                       className="flex-1 py-1.5 px-2 rounded-lg text-xs font-medium border border-[var(--accent-color)] text-[var(--accent-color)] bg-transparent hover:bg-[var(--accent-color)]/10 active:scale-[0.98] transition-all disabled:opacity-50 text-center"
                     >
                       {updatingClase === `${c.id}-Aplazada` ? '...' : 'Aplazada'}
@@ -385,9 +402,9 @@ export default function Dashboard() {
                       type="button"
                       disabled={!!updatingClase}
                       onClick={() => handleCambiarEstado(c.id, 'Cancelada')}
-                      className="flex-1 py-1.5 px-2 rounded-lg text-xs font-medium text-[var(--accent-color)] hover:bg-[var(--accent-color)]/10 border border-transparent hover:border-[var(--accent-color)]/20 active:scale-[0.98] transition-all disabled:opacity-50 text-center"
+                      className="flex-1 py-1.5 px-2 rounded-lg text-xs font-medium text-[var(--accent-color)] hover:bg-[var(--accent-color)]/10 border border-transparent hover:border-[var(--accent-color)]/20 active:scale-[0.98] transition-all disabled:opacity-50 text-center truncate"
                     >
-                      {updatingClase === `${c.id}-Cancelada` ? '...' : 'Cancelada'}
+                      {updatingClase === `${c.id}-Cancelada` ? '...' : 'Cancelada/Sustituida'}
                     </button>
                   </div>
                 </div>
@@ -395,20 +412,6 @@ export default function Dashboard() {
             })}
           </div>
         )}
-      </section>
-
-      {/* ── Tabla de grupos activos (V2) ── */}
-      <section>
-        <h2 className="text-sm font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider mb-3">
-          Grupos Activos
-        </h2>
-        <Table
-          columns={colsGrupos}
-          data={gruposActivos}
-          loading={loadingGrupos}
-          emptyMessage="No hay grupos activos"
-          onRowClick={(g) => setDetalle(g)}
-        />
       </section>
 
       {/* ── Gráfica histórica ── */}
@@ -451,6 +454,20 @@ export default function Dashboard() {
             </BarChart>
           </ResponsiveContainer>
         </div>
+      </section>
+
+      {/* ── Tabla de grupos activos (V2) ── */}
+      <section>
+        <h2 className="text-sm font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider mb-3">
+          Grupos Activos
+        </h2>
+        <Table
+          columns={colsGrupos}
+          data={gruposActivos}
+          loading={loadingGrupos}
+          emptyMessage="No hay grupos activos"
+          onRowClick={(g) => setDetalle(g)}
+        />
       </section>
 
 

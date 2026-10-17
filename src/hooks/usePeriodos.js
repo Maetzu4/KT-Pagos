@@ -3,8 +3,10 @@ import { supabase } from '../lib/supabaseClient';
 import { parseISO, startOfMonth, endOfMonth, formatISO, nombrePeriodo } from '../lib/dateUtils';
 
 /** Obtiene el precio efectivo de una clase V2 */
-export const getPrecioClase = (c) =>
-  Number(c.precio_cobrado ?? c.grupos?.tarifas?.precio_regular ?? 0);
+export const getPrecioClase = (c) => {
+  if (c?.estado_clase === 'Cancelada') return 0;
+  return Number(c?.precio_cobrado ?? c?.grupos?.tarifas?.precio_regular ?? 0);
+};
 
 export function usePeriodos() {
   const [periodos, setPeriodos] = useState([]);
