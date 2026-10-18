@@ -78,7 +78,7 @@ function EstadoSelector({ claseId, estadoActual, onUpdate }) {
 }
 
 // ─── Modal principal ──────────────────────────────────────────────────────────
-export function GrupoDetailModal({ grupo, open, onClose, onEdit }) {
+export function GrupoDetailModal({ grupo, open, onClose, onEdit, onClassUpdate }) {
   const [clases,           setClases]           = useState([]);
   const [loading,          setLoading]          = useState(false);
   const [isExtraModalOpen, setIsExtraModalOpen] = useState(false);
@@ -113,6 +113,7 @@ export function GrupoDetailModal({ grupo, open, onClose, onEdit }) {
       setClases((prev) =>
         prev.map((c) => (c.id === claseId ? { ...c, estado_clase: data.estado_clase } : c))
       );
+      onClassUpdate?.();
     }
   };
 
@@ -273,7 +274,10 @@ export function GrupoDetailModal({ grupo, open, onClose, onEdit }) {
       isOpen={isExtraModalOpen}
       onClose={() => setIsExtraModalOpen(false)}
       grupoPreseleccionado={grupo.id}
-      onSuccess={fetchClases}
+      onSuccess={() => {
+        fetchClases();
+        onClassUpdate?.();
+      }}
     />
   </>
 );

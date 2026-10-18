@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { TrendingUp, DollarSign, Users, CheckCircle2, Calendar, Plus } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid,
@@ -11,6 +11,7 @@ import { Modal } from '../components/ui/Modal';
 import { GrupoDetailModal } from '../components/ui/GrupoDetailModal';
 import { PeriodoModal } from '../components/ui/PeriodoModal';
 import { ClaseExtraModal } from '../components/modals/ClaseExtraModal';
+import { ReprogramarClaseModal } from '../components/modals/ReprogramarClaseModal';
 import { useGrupos } from '../hooks/useGrupos';
 import { usePeriodos } from '../hooks/usePeriodos';
 import { useClases } from '../hooks/useClases';
@@ -58,6 +59,7 @@ export default function Dashboard() {
   const {
     periodos, periodoActual, periodoAnterior,
     updatePeriodo,
+    refetch: fetchPeriodos,
     loading: loadingPeriodos,
   } = usePeriodos();
 
@@ -78,10 +80,11 @@ export default function Dashboard() {
     return clasesMes.filter((c) => c.fecha_clase?.startsWith(periodoActual.key_periodo));
   }, [clasesMes, periodoActual]);
 
-  const [detalle,          setDetalle]          = useState(null);
-  const [selectedPeriodo,  setSelectedPeriodo]  = useState(null);
-  const [chartPeriodos,    setChartPeriodos]    = useState(() => Number(localStorage.getItem('chartPeriodos')) || 8);
-  const [isExtraModalOpen, setIsExtraModalOpen] = useState(false);
+  const [detalle,             setDetalle]             = useState(null);
+  const [selectedPeriodo,     setSelectedPeriodo]     = useState(null);
+  const [chartPeriodos,       setChartPeriodos]       = useState(() => Number(localStorage.getItem('chartPeriodos')) || 8);
+  const [isExtraModalOpen,    setIsExtraModalOpen]    = useState(false);
+  const [claseAReprogramar,   setClaseAReprogramar]   = useState(null);
 
   const handleChartChange = (n) => {
     setChartPeriodos(n);
@@ -91,18 +94,25 @@ export default function Dashboard() {
   const hoyStr = new Date().toISOString().split('T')[0];
   const pendientes = useMemo(() => {
     return clasesFiltradas
-      .filter((c) => c.fecha_clase <= hoyStr && c.estado_clase === 'Programada')
+      .filter((c) => c.fecha_clase <= hoyStr && (c.estado_clase === 'Programada' || c.estado_clase === 'Aplazada'))
       .slice()
       .sort((a, b) => (a.fecha_clase ?? '').localeCompare(b.fecha_clase ?? ''));
   }, [clasesFiltradas, hoyStr]);
 
   const [updatingClase, setUpdatingClase] = useState(null);
 
+  const handleClassUpdate = useCallback(async () => {
+    await Promise.all([
+      refetchClases?.(),
+      fetchPeriodos?.(),
+    ]);
+  }, [refetchClases, fetchPeriodos]);
+
   const handleCambiarEstado = async (claseId, nuevoEstado) => {
     setUpdatingClase(`${claseId}-${nuevoEstado}`);
     try {
       await updateClase(claseId, { estado_clase: nuevoEstado });
-      await refetchClases?.();
+      await handleClassUpdate();
     } catch (err) {
       console.error('Error al actualizar estado de clase:', err);
     } finally {
@@ -110,14 +120,18 @@ export default function Dashboard() {
     }
   };
 
-  const handleAplazarClase = async (c) => {
-    const nuevaFecha = window.prompt('Introduce la nueva fecha (YYYY-MM-DD):', c.fecha_clase);
-    if (!nuevaFecha || !nuevaFecha.trim()) return;
+  const handleAplazarClase = (c) => {
+    setClaseAReprogramar(c);
+  };
 
+  const handleConfirmarReprogramacion = async (nuevaFecha) => {
+    if (!claseAReprogramar) return;
+    const c = claseAReprogramar;
+    setClaseAReprogramar(null);
     setUpdatingClase(`${c.id}-Aplazada`);
     try {
-      await updateClase(c.id, { fecha_clase: nuevaFecha.trim(), estado_clase: 'Programada' });
-      await refetchClases?.();
+      await updateClase(c.id, { fecha_clase: nuevaFecha, estado_clase: 'Aplazada' });
+      await handleClassUpdate();
     } catch (err) {
       console.error('Error al aplazar clase:', err);
     } finally {
@@ -362,7 +376,12 @@ export default function Dashboard() {
                       <span className="text-xs tabular-nums text-zinc-500 dark:text-zinc-400 font-medium">
                         {fmtFecha(c.fecha_clase)}
                       </span>
-                      {esAtrasada && (
+                      {c.estado_clase === 'Aplazada' && (
+                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[var(--accent-color)]/10 text-[var(--accent-color)]">
+                          APLAZADA
+                        </span>
+                      )}
+                      {esAtrasada && c.estado_clase !== 'Aplazada' && (
                         <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[var(--accent-color)]/10 text-[var(--accent-color)]">
                           Atrasada
                         </span>
@@ -477,6 +496,7 @@ export default function Dashboard() {
         grupo={detalle}
         open={!!detalle}
         onClose={() => setDetalle(null)}
+        onClassUpdate={handleClassUpdate}
       />
 
       {/* ── Modal de período ── */}
@@ -491,7 +511,15 @@ export default function Dashboard() {
       <ClaseExtraModal
         isOpen={isExtraModalOpen}
         onClose={() => setIsExtraModalOpen(false)}
-        onSuccess={() => refetchClases?.()}
+        onSuccess={() => handleClassUpdate()}
+      />
+
+      {/* ── Modal Reprogramar Clase ── */}
+      <ReprogramarClaseModal
+        isOpen={!!claseAReprogramar}
+        clase={claseAReprogramar}
+        onClose={() => setClaseAReprogramar(null)}
+        onConfirm={handleConfirmarReprogramacion}
       />
     </div>
   );
