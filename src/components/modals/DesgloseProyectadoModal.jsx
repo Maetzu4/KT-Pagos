@@ -11,17 +11,10 @@ const getPrecioClase = (c) => {
 
 function Fila({ icon: Icon, label, value, sub, highlight, badge, muted }) {
   return (
-    <div className="flex items-center justify-between py-3 border-b border-zinc-100 dark:border-zinc-800/60 last:border-0">
+    <div className="flex items-center justify-between py-3">
       <div className="flex items-center gap-2.5 min-w-0">
-        <div
-          className={[
-            'w-8 h-8 rounded-xl flex items-center justify-center shrink-0',
-            highlight
-              ? 'bg-[var(--accent-color)]/10 text-[var(--accent-color)]'
-              : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400',
-          ].join(' ')}
-        >
-          <Icon size={15} />
+        <div className="w-8 h-8 rounded-xl bg-[var(--accent-color)]/10 text-[var(--accent-color)] flex items-center justify-center shrink-0">
+          <Icon size={15} className="text-[var(--accent-color)]" />
         </div>
         <div className="min-w-0">
           <div className="flex items-center gap-2">
@@ -70,23 +63,22 @@ export function DesgloseProyectadoModal({ open, onClose, periodo, clases }) {
   // Montos base proyectados
   const montoRegulares = clasesRegulares.length > 0
     ? clasesRegulares.reduce((s, c) => s + getPrecioClase(c), 0)
-    : (periodo?.ingresos_regulares ?? 0);
+    : Number(periodo?.ingresos_regulares ?? 0);
 
   const montoExtras = clasesExtras.length > 0
     ? clasesExtras.reduce((s, c) => s + getPrecioClase(c), 0)
-    : (periodo?.ingresos_extras ?? 0);
+    : Number(periodo?.ingresos_extras ?? 0);
 
-  // Bono
+  // Multiplicador y monto de bono
   const multiplicador = Number(periodo?.multiplicador_bono ?? 0);
   const pctBono = Math.round(multiplicador * 100);
   const montoBono = montoRegulares * multiplicador;
 
-  // Deuda anterior
+  // Deuda anterior (arrastre)
   const deudaAnterior = Number(periodo?.deuda_anterior ?? 0);
 
-  // Proyectado Total del Mes
-  const totalProyectado = montoRegulares + montoExtras + montoBono + (deudaAnterior > 0 ? deudaAnterior : 0) ||
-    (periodo?.total_a_cobrar ?? periodo?.estimado_real ?? 0);
+  // Proyectado Total del Mes (INCLUYE Bono)
+  const totalProyectado = montoRegulares + montoExtras + montoBono + (deudaAnterior > 0 ? deudaAnterior : 0);
 
   // Total Ganado a la fecha (solo clases en estado 'Completada')
   const completadas = useMemo(
@@ -106,7 +98,6 @@ export function DesgloseProyectadoModal({ open, onClose, periodo, clases }) {
         cantCompletadas: completadas.length,
       };
     }
-    // Fallback: periodo.estimado_real calculado en usePeriodos se basa solo en Completadas
     return {
       totalGanado: Number(periodo?.estimado_real ?? 0),
       cantCompletadas: periodo?.clases?.filter((c) => c?.estado_clase === 'Completada').length || 0,
@@ -118,8 +109,8 @@ export function DesgloseProyectadoModal({ open, onClose, periodo, clases }) {
   return (
     <Modal open={open} onClose={onClose} title="Desglose Proyectado">
       <div className="space-y-4">
-        {/* ── Arriba: Proyectado Total del Mes ── */}
-        <div className="rounded-2xl bg-[var(--accent-color)]/10 border border-[var(--accent-color)]/30 p-4 sm:p-5 flex items-center justify-between shadow-sm">
+        {/* ── Arriba: Proyectado Total del Mes (diseño sobrio de bloque sin bordes) ── */}
+        <div className="rounded-2xl bg-zinc-50 dark:bg-zinc-800/40 p-4 sm:p-5 flex items-center justify-between">
           <div>
             <div className="flex items-center gap-2">
               <span className="text-xs uppercase tracking-wider font-semibold text-[var(--accent-color)]">
@@ -136,12 +127,12 @@ export function DesgloseProyectadoModal({ open, onClose, periodo, clases }) {
             </p>
           </div>
           <div className="w-11 h-11 rounded-xl bg-[var(--accent-color)]/15 text-[var(--accent-color)] flex items-center justify-center shrink-0">
-            <TrendingUp size={22} />
+            <TrendingUp size={22} className="text-[var(--accent-color)]" />
           </div>
         </div>
 
-        {/* ── Medio: Desglose ── */}
-        <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 overflow-hidden px-4 shadow-sm">
+        {/* ── Medio: Desglose en bloque con separadores sutiles ── */}
+        <div className="rounded-2xl bg-zinc-50 dark:bg-zinc-800/40 divide-y divide-zinc-200/60 dark:divide-zinc-800/50 overflow-hidden px-4">
           <Fila
             icon={CheckCircle2}
             label="Clases Regulares"
@@ -176,15 +167,15 @@ export function DesgloseProyectadoModal({ open, onClose, periodo, clases }) {
           )}
         </div>
 
-        {/* ── Abajo: Sección destacada Total Ganado a la fecha ── */}
-        <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 dark:bg-emerald-500/10 p-4 space-y-2.5 shadow-sm">
+        {/* ── Abajo: Total Ganado a la fecha (bloque de acento sin bordes) ── */}
+        <div className="rounded-2xl bg-[var(--accent-color)]/10 p-4 space-y-2.5">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-9 h-9 rounded-xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
-                <CheckCircle2 size={18} />
+              <div className="w-9 h-9 rounded-xl bg-[var(--accent-color)]/20 text-[var(--accent-color)] flex items-center justify-center shrink-0">
+                <CheckCircle2 size={18} className="text-[var(--accent-color)]" />
               </div>
               <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 truncate">
+                <p className="text-xs font-semibold uppercase tracking-wider text-[var(--accent-color)] truncate">
                   Total Ganado a la fecha
                 </p>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
@@ -195,7 +186,7 @@ export function DesgloseProyectadoModal({ open, onClose, periodo, clases }) {
               </div>
             </div>
             <div className="text-right shrink-0">
-              <p className="text-xl sm:text-2xl font-bold font-mono text-emerald-600 dark:text-emerald-400 tabular-nums">
+              <p className="text-xl sm:text-2xl font-bold font-mono text-[var(--accent-color)] tabular-nums">
                 {formatCurrency(totalGanado)}
               </p>
               {totalProyectado > 0 && (
@@ -206,10 +197,10 @@ export function DesgloseProyectadoModal({ open, onClose, periodo, clases }) {
             </div>
           </div>
 
-          {/* Barra de progreso sutil */}
-          <div className="w-full h-1.5 bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden">
+          {/* Barra de progreso */}
+          <div className="w-full h-1.5 bg-[var(--accent-color)]/20 rounded-full overflow-hidden">
             <div
-              className="h-full bg-emerald-500 rounded-full transition-all duration-500"
+              className="h-full bg-[var(--accent-color)] rounded-full transition-all duration-500"
               style={{ width: `${pctAvance}%` }}
             />
           </div>

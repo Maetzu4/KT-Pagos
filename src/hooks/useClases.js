@@ -78,6 +78,7 @@ export function useClases(filtros = {}) {
       estado_clase: estado_clase || 'Programada',
       es_adicional: isAdicional,
       en_reclamo: Boolean(en_reclamo),
+      fue_aplazada: Boolean(values.fue_aplazada),
       precio_cobrado,
       periodo_id: null,
     };
@@ -140,6 +141,7 @@ export function useClases(filtros = {}) {
       'grupo_id',
       'periodo_id',
       'user_id',
+      'fue_aplazada',
     ]);
 
     const sanitizedPayload = {};

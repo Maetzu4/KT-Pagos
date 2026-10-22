@@ -13,6 +13,7 @@ import { PeriodoModal } from '../components/ui/PeriodoModal';
 import { ClaseExtraModal } from '../components/modals/ClaseExtraModal';
 import { ReprogramarClaseModal } from '../components/modals/ReprogramarClaseModal';
 import { DesgloseProyectadoModal } from '../components/modals/DesgloseProyectadoModal';
+import { ResumenClasesModal } from '../components/modals/ResumenClasesModal';
 import { useGrupos } from '../hooks/useGrupos';
 import { usePeriodos } from '../hooks/usePeriodos';
 import { useClases } from '../hooks/useClases';
@@ -87,6 +88,7 @@ export default function Dashboard() {
   const [isExtraModalOpen,    setIsExtraModalOpen]    = useState(false);
   const [claseAReprogramar,   setClaseAReprogramar]   = useState(null);
   const [showDesglose,        setShowDesglose]        = useState(false);
+  const [showResumenClases,   setShowResumenClases]   = useState(false);
 
   const handleChartChange = (n) => {
     setChartPeriodos(n);
@@ -132,7 +134,7 @@ export default function Dashboard() {
     setClaseAReprogramar(null);
     setUpdatingClase(`${c.id}-Aplazada`);
     try {
-      await updateClase(c.id, { fecha_clase: nuevaFecha, estado_clase: 'Aplazada' });
+      await updateClase(c.id, { fecha_clase: nuevaFecha, estado_clase: 'Programada', fue_aplazada: true });
       await handleClassUpdate();
     } catch (err) {
       console.error('Error al aplazar clase:', err);
@@ -141,24 +143,47 @@ export default function Dashboard() {
     }
   };
 
-  // ── Métricas V2 ─────────────────────────────────────────────────────────────
+  // ── Métricas V2 (Cálculo exacto incluyendo Bono) ───────────────────────────
   const { proyectado, ganado, totalMes, completadas } = useMemo(() => {
-    const all            = clasesFiltradas;
+    const all            = clasesFiltradas || [];
     const totalMes       = all.length;
     const completadasArr = all.filter((c) => c.estado_clase === 'Completada');
 
-    const proyectado = all.reduce((s, c) => Number(s) + Number(getPrecio(c)), 0);
-    const ganado     = completadasArr.reduce((s, c) => Number(s) + Number(getPrecio(c)), 0);
+    // Desglose de ingresos de clases válidas
+    const ingresosRegulares = all
+      .filter((c) => !c.es_adicional && c.estado_clase !== 'Cancelada')
+      .reduce((s, c) => Number(s) + Number(getPrecio(c)), 0);
+
+    const ingresosExtras = all
+      .filter((c) => c.es_adicional && c.estado_clase !== 'Cancelada')
+      .reduce((s, c) => Number(s) + Number(getPrecio(c)), 0);
+
+    // Bono mensual calculado sobre clases regulares
+    const multiplicador = Number(periodoActual?.multiplicador_bono ?? 0);
+    const montoBono = ingresosRegulares * multiplicador;
+
+    // Total Proyectado incluye el Bono
+    const proyectado = ingresosRegulares + ingresosExtras + montoBono;
+
+    // Total Ganado a la fecha (solo completadas + bono de clases regulares completadas)
+    const ganadoRegulares = completadasArr
+      .filter((c) => !c.es_adicional)
+      .reduce((s, c) => Number(s) + Number(getPrecio(c)), 0);
+    const ganadoExtras = completadasArr
+      .filter((c) => c.es_adicional)
+      .reduce((s, c) => Number(s) + Number(getPrecio(c)), 0);
+    const ganadoBono = ganadoRegulares * multiplicador;
+    const ganado = ganadoRegulares + ganadoExtras + ganadoBono;
 
     return { proyectado, ganado, totalMes, completadas: completadasArr.length };
-  }, [clasesFiltradas]);
+  }, [clasesFiltradas, periodoActual]);
 
-  // Números animados UX
-  const animProyectado    = useCountUp(proyectado);
-  const animGanado        = useCountUp(ganado);
-  const animMesAnterior   = useCountUp(periodoAnterior?.pagado_real ?? 0);
-  const animCompletadas   = useCountUp(completadas);
-  const animGruposActivos = useCountUp(gruposActivos.length);
+  // Números animados UX: arrancan limpiamente en 0 mientras loading esté activo
+  const animProyectado    = useCountUp(loadingClases || loadingPeriodos ? 0 : proyectado);
+  const animGanado        = useCountUp(loadingClases ? 0 : ganado);
+  const animMesAnterior   = useCountUp(loadingPeriodos ? 0 : (periodoAnterior?.pagado_real ?? 0));
+  const animCompletadas   = useCountUp(loadingClases ? 0 : completadas);
+  const animGruposActivos = useCountUp(loadingGrupos ? 0 : gruposActivos.length);
 
   // ── Progreso por grupo (clases completadas en el periodo actual) ───────────
   const progresoByGrupo = useMemo(() => {
@@ -284,7 +309,7 @@ export default function Dashboard() {
         <button
           type="button"
           onClick={() => setShowDesglose(true)}
-          className="mt-3 inline-flex items-center gap-1.5 text-xs text-white/70 hover:text-white transition-colors group"
+          className="mt-3 inline-flex items-center gap-1.5 text-xs text-white/70 hover:text-white transition-colors group cursor-pointer"
         >
           <Info size={12} className="group-hover:scale-110 transition-transform" />
           Ver desglose
@@ -299,7 +324,7 @@ export default function Dashboard() {
           value={formatCurrency(animGanado)}
           sub="Solo clases completadas"
           icon={DollarSign}
-          loading={loadingClases}
+          onClick={() => setShowDesglose(true)}
         />
 
         {/* Mes Anterior */}
@@ -322,7 +347,6 @@ export default function Dashboard() {
           }
           icon={DollarSign}
           onClick={() => periodoAnterior && setSelectedPeriodo(periodoAnterior)}
-          loading={loadingPeriodos}
         />
 
         {/* Clases impartidas */}
@@ -335,7 +359,7 @@ export default function Dashboard() {
               : 'Sin clases este mes'
           }
           icon={CheckCircle2}
-          loading={loadingClases}
+          onClick={() => setShowResumenClases(true)}
         />
 
         {/* Grupos activos */}
@@ -344,7 +368,9 @@ export default function Dashboard() {
           value={Math.round(animGruposActivos)}
           sub={`de ${grupos.length} grupos totales`}
           icon={Users}
-          loading={loadingGrupos}
+          onClick={() => {
+            document.getElementById('seccion-grupos')?.scrollIntoView({ behavior: 'smooth' });
+          }}
         />
       </div>
 
@@ -486,7 +512,7 @@ export default function Dashboard() {
       </section>
 
       {/* ── Tabla de grupos activos (V2) ── */}
-      <section>
+      <section id="seccion-grupos">
         <h2 className="text-sm font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider mb-3">
           Grupos Activos
         </h2>
@@ -498,8 +524,6 @@ export default function Dashboard() {
           onRowClick={(g) => setDetalle(g)}
         />
       </section>
-
-
 
       {/* ── Modal de detalle del grupo (clic en fila) ── */}
       <GrupoDetailModal
@@ -538,6 +562,18 @@ export default function Dashboard() {
         onClose={() => setShowDesglose(false)}
         periodo={periodoActual}
         clases={clasesFiltradas}
+      />
+
+      {/* ── Modal Resumen de Clases del Mes ── */}
+      <ResumenClasesModal
+        isOpen={showResumenClases}
+        onClose={() => setShowResumenClases(false)}
+        clases={clasesFiltradas}
+        onAplazar={(c) => setClaseAReprogramar(c)}
+        updateClase={async (claseId, values) => {
+          await updateClase(claseId, values);
+          await handleClassUpdate();
+        }}
       />
     </div>
   );
