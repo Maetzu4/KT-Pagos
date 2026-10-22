@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Users, BarChart3, Settings, LogOut } from 'lucide-react';
+import { LayoutDashboard, Users, BarChart3, Settings, LogOut, Trophy } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { useTheme } from '../../context/ThemeContext';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -9,6 +9,7 @@ import { cn } from '../../lib/utils';
 const NAV_ITEMS = [
   { to: '/',              icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/finanzas',      icon: BarChart3,        label: 'Finanzas'  },
+  { to: '/bonos',         icon: Trophy,           label: 'Bonos'     },
   { to: '/grupos',        icon: Users,            label: 'Grupos'    },
   { to: '/configuracion', icon: Settings,         label: 'Config'    },
 ];

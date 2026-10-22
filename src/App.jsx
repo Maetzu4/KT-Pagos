@@ -6,6 +6,7 @@ import { supabase } from './lib/supabaseClient';
 import Dashboard     from './pages/Dashboard';
 import Grupos        from './pages/Grupos';
 import Finanzas      from './pages/Finanzas';
+import Bonos         from './pages/Bonos';
 import Configuracion from './pages/Configuracion';
 import Login         from './pages/Login';
 import Registro      from './pages/Registro';
@@ -75,6 +76,7 @@ export default function App() {
                     <Route path="/"              element={<Dashboard />} />
                     <Route path="/grupos"        element={<Grupos />} />
                     <Route path="/finanzas"      element={<Finanzas />} />
+                    <Route path="/bonos"         element={<Bonos />} />
                     <Route path="/configuracion" element={<Configuracion />} />
                   </Routes>
                 </Layout>

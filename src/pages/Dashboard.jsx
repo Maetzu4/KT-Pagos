@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
-import { TrendingUp, DollarSign, Users, CheckCircle2, Calendar, Plus } from 'lucide-react';
+import { TrendingUp, DollarSign, Users, CheckCircle2, Calendar, Plus, Info } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid,
 } from 'recharts';
@@ -12,6 +12,7 @@ import { GrupoDetailModal } from '../components/ui/GrupoDetailModal';
 import { PeriodoModal } from '../components/ui/PeriodoModal';
 import { ClaseExtraModal } from '../components/modals/ClaseExtraModal';
 import { ReprogramarClaseModal } from '../components/modals/ReprogramarClaseModal';
+import { DesgloseProyectadoModal } from '../components/modals/DesgloseProyectadoModal';
 import { useGrupos } from '../hooks/useGrupos';
 import { usePeriodos } from '../hooks/usePeriodos';
 import { useClases } from '../hooks/useClases';
@@ -85,6 +86,7 @@ export default function Dashboard() {
   const [chartPeriodos,       setChartPeriodos]       = useState(() => Number(localStorage.getItem('chartPeriodos')) || 8);
   const [isExtraModalOpen,    setIsExtraModalOpen]    = useState(false);
   const [claseAReprogramar,   setClaseAReprogramar]   = useState(null);
+  const [showDesglose,        setShowDesglose]        = useState(false);
 
   const handleChartChange = (n) => {
     setChartPeriodos(n);
@@ -279,6 +281,14 @@ export default function Dashboard() {
         <div className="text-3xl sm:text-5xl font-bold tracking-tight text-white font-mono mt-1">
           {formatCurrency(animProyectado)}
         </div>
+        <button
+          type="button"
+          onClick={() => setShowDesglose(true)}
+          className="mt-3 inline-flex items-center gap-1.5 text-xs text-white/70 hover:text-white transition-colors group"
+        >
+          <Info size={12} className="group-hover:scale-110 transition-transform" />
+          Ver desglose
+        </button>
       </div>
 
       {/* ── KPIs (Grid de 4 tarjetas) ── */}
@@ -520,6 +530,14 @@ export default function Dashboard() {
         clase={claseAReprogramar}
         onClose={() => setClaseAReprogramar(null)}
         onConfirm={handleConfirmarReprogramacion}
+      />
+
+      {/* ── Modal Desglose Proyectado ── */}
+      <DesgloseProyectadoModal
+        open={showDesglose}
+        onClose={() => setShowDesglose(false)}
+        periodo={periodoActual}
+        clases={clasesFiltradas}
       />
     </div>
   );

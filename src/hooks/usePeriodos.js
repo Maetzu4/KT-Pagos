@@ -52,7 +52,7 @@ export function usePeriodos() {
 
         supabase
           .from('periodos')
-          .select('id, user_id, mes, anio, key_periodo, pagado_real, notas_reclamo, arrastrado')
+          .select('id, user_id, mes, anio, key_periodo, pagado_real, notas_reclamo, arrastrado, requisitos_bono, r1_grado, r2_grado, r3_grado')
           .order('key_periodo', { ascending: false }),
       ]);
 
@@ -98,6 +98,10 @@ export function usePeriodos() {
             arrastrado: 0,
             user_id: null,
             existeEnBD: false,
+            requisitos_bono: false,
+            r1_grado: 'none',
+            r2_grado: 'none',
+            r3_grado: 'none',
           });
         }
         periodosMap.get(key_periodo).clases.push(c);
@@ -130,6 +134,10 @@ export function usePeriodos() {
             arrastrado: Number(p.arrastrado) || 0,
             user_id: p.user_id,
             existeEnBD: true,
+            requisitos_bono: p.requisitos_bono ?? false,
+            r1_grado: p.r1_grado || 'none',
+            r2_grado: p.r2_grado || 'none',
+            r3_grado: p.r3_grado || 'none',
           });
         }
       }
@@ -144,6 +152,10 @@ export function usePeriodos() {
           virtual.arrastrado = Number(bdRecord.arrastrado) || 0;
           virtual.user_id = bdRecord.user_id;
           virtual.existeEnBD = true;
+          virtual.requisitos_bono = bdRecord.requisitos_bono ?? false;
+          virtual.r1_grado = bdRecord.r1_grado || 'none';
+          virtual.r2_grado = bdRecord.r2_grado || 'none';
+          virtual.r3_grado = bdRecord.r3_grado || 'none';
           if (bdRecord.mes) virtual.mes = bdRecord.mes;
           if (bdRecord.anio) virtual.anio = bdRecord.anio;
         } else {
@@ -152,19 +164,50 @@ export function usePeriodos() {
           virtual.notas_reclamo = '';
           virtual.arrastrado = 0;
           virtual.existeEnBD = false;
+          virtual.requisitos_bono = false;
+          virtual.r1_grado = 'none';
+          virtual.r2_grado = 'none';
+          virtual.r3_grado = 'none';
         }
       }
 
-      // 4. Calcular Total Estimado y Deuda por Reclamos
+      // 4. Calcular Total Estimado y Deuda por Reclamos (con lógica de bono)
+      const gradeMultiplier = (grade) => {
+        if (grade === 'good') return 0.05;
+        if (grade === 'amazing') return 0.10;
+        return 0;
+      };
+
       const listaBase = Array.from(periodosMap.values()).map((p) => {
         const clases = p.clases || [];
-        const estimado_real = clases.reduce((s, c) => Number(s) + Number(getPrecioClase(c)), 0);
+
+        // Separar ingresos regulares y extras (excluyendo Canceladas)
+        const ingresos_regulares = clases
+          .filter((c) => !c.es_adicional && c.estado_clase !== 'Cancelada')
+          .reduce((s, c) => Number(s) + Number(getPrecioClase(c)), 0);
+
+        const ingresos_extras = clases
+          .filter((c) => c.es_adicional && c.estado_clase !== 'Cancelada')
+          .reduce((s, c) => Number(s) + Number(getPrecioClase(c)), 0);
+
+        // Calcular multiplicador de bono
+        const multiplicador_bono = p.requisitos_bono
+          ? gradeMultiplier(p.r1_grado) + gradeMultiplier(p.r2_grado) + gradeMultiplier(p.r3_grado)
+          : 0;
+
+        const monto_bono = ingresos_regulares * multiplicador_bono;
+        const estimado_real = ingresos_regulares + ingresos_extras + monto_bono;
+
         const deuda_reclamos = clases
           .filter((c) => c.en_reclamo)
           .reduce((s, c) => Number(s) + Number(getPrecioClase(c)), 0);
 
         return {
           ...p,
+          ingresos_regulares,
+          ingresos_extras,
+          multiplicador_bono,
+          monto_bono,
           estimado_real,
           deuda_reclamos,
         };
@@ -252,6 +295,10 @@ export function usePeriodos() {
       key_periodo,
       pagado_real,
       notas_reclamo,
+      requisitos_bono: values.requisitos_bono ?? periodoData.requisitos_bono ?? false,
+      r1_grado: values.r1_grado ?? periodoData.r1_grado ?? 'none',
+      r2_grado: values.r2_grado ?? periodoData.r2_grado ?? 'none',
+      r3_grado: values.r3_grado ?? periodoData.r3_grado ?? 'none',
     };
 
     const { data, error: err } = await supabase
@@ -263,6 +310,22 @@ export function usePeriodos() {
     if (err) throw new Error(err.message);
     await fetchPeriodos();
     return data;
+  };
+
+  /**
+   * upsertPeriodo: guarda los campos de bonos (y opcionalmente financieros) de un periodo.
+   * Acepta el objeto completo del periodo con los campos actualizados.
+   */
+  const upsertPeriodo = async (periodoData, extraValues = {}) => {
+    return savePeriodoFinanciero(periodoData, {
+      pagado_real: periodoData.pagado_real,
+      notas_reclamo: periodoData.notas_reclamo,
+      requisitos_bono: periodoData.requisitos_bono,
+      r1_grado: periodoData.r1_grado,
+      r2_grado: periodoData.r2_grado,
+      r3_grado: periodoData.r3_grado,
+      ...extraValues,
+    });
   };
 
   /** Alias para compatibilidad con interfaces existentes */
@@ -329,6 +392,7 @@ export function usePeriodos() {
     refetch: fetchPeriodos,
     updatePeriodo,
     savePeriodoFinanciero,
+    upsertPeriodo,
     deletePeriodo,
     periodoActual,
     periodoAnterior,
