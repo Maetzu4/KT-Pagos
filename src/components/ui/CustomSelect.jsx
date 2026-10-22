@@ -26,7 +26,18 @@ export function CustomSelect({
   const [open, setOpen] = useState(false);
   const containerRef = useRef(null);
 
-  const selectedOption = options.find((o) => String(o.value) === String(value));
+  // Normalizar opciones para admitir tanto objetos { value, label } como primitivos (strings/números)
+  const normalizedOptions = options.map((opt) => {
+    if (typeof opt === 'object' && opt !== null) {
+      return {
+        value: String(opt.value ?? ''),
+        label: String(opt.label ?? opt.value ?? ''),
+      };
+    }
+    return { value: String(opt), label: String(opt) };
+  });
+
+  const selectedOption = normalizedOptions.find((o) => String(o.value) === String(value));
 
   // Cierre al hacer clic fuera
   useEffect(() => {
@@ -50,17 +61,20 @@ export function CustomSelect({
     if (e.key === 'Escape') setOpen(false);
     if (e.key === 'ArrowDown' && open) {
       e.preventDefault();
-      const idx = options.findIndex((o) => String(o.value) === String(value));
-      const next = options[idx + 1];
+      const idx = normalizedOptions.findIndex((o) => String(o.value) === String(value));
+      const next = normalizedOptions[idx + 1];
       if (next) onChange(next.value);
     }
     if (e.key === 'ArrowUp' && open) {
       e.preventDefault();
-      const idx = options.findIndex((o) => String(o.value) === String(value));
-      const prev = options[idx - 1];
+      const idx = normalizedOptions.findIndex((o) => String(o.value) === String(value));
+      const prev = normalizedOptions[idx - 1];
       if (prev) onChange(prev.value);
     }
   };
+
+  const hasCustomBg = className && /(^|\s)bg-/.test(className);
+  const hasCustomBorder = className && /(^|\s)border-0(\s|$)|(^|\s)border-none(\s|$)/.test(className);
 
   return (
     <div ref={containerRef} className="relative w-full">
@@ -74,14 +88,17 @@ export function CustomSelect({
         onClick={() => !disabled && setOpen((v) => !v)}
         onKeyDown={handleKeyDown}
         className={cn(
-          'w-full h-10 flex items-center justify-between gap-2 rounded-lg px-3 text-sm',
-          'bg-transparent dark:bg-zinc-900/40 border text-left',
+          'w-full h-10 flex items-center justify-between gap-2 rounded-lg px-3 text-sm text-left',
           'transition-all duration-200 ease-in-out',
-          'outline-none focus:outline-none focus:border-[var(--accent-color)] focus:ring-1 focus:ring-[var(--accent-color)] focus:ring-offset-0 focus:ring-offset-transparent',
+          'outline-none focus:outline-none focus:border-[var(--accent-color)] focus:ring-2 focus:ring-[var(--accent-color)]',
           'disabled:opacity-40 disabled:cursor-not-allowed',
-          open
-            ? 'border-[var(--accent-color)] ring-1 ring-[var(--accent-color)]'
-            : 'border-zinc-300 dark:border-white/10 hover:border-zinc-400 dark:hover:border-white/25',
+          !hasCustomBg && 'bg-transparent dark:bg-zinc-900/40',
+          !hasCustomBorder && (
+            open
+              ? 'border border-[var(--accent-color)] ring-1 ring-[var(--accent-color)]'
+              : 'border border-zinc-300 dark:border-white/10 hover:border-zinc-400 dark:hover:border-white/25'
+          ),
+          hasCustomBorder && open && 'ring-2 ring-[var(--accent-color)]',
           selectedOption ? 'text-zinc-900 dark:text-white' : 'text-zinc-400 dark:text-zinc-500',
           className
         )}
@@ -109,10 +126,10 @@ export function CustomSelect({
             'max-h-60 overflow-y-auto'
           )}
         >
-          {options.length === 0 ? (
+          {normalizedOptions.length === 0 ? (
             <div className="px-4 py-3 text-sm text-zinc-500 text-center">Sin opciones</div>
           ) : (
-            options.map((option) => {
+            normalizedOptions.map((option) => {
               const isSelected = String(option.value) === String(value);
               return (
                 <button
@@ -126,7 +143,7 @@ export function CustomSelect({
                   }}
                   className={cn(
                     'w-full flex items-center justify-between gap-3 px-4 py-2.5 text-sm text-left',
-                    'transition-all duration-150',
+                    'transition-all duration-150 cursor-pointer',
                     isSelected
                       ? 'bg-[var(--accent-color)]/10 dark:bg-[var(--accent-color)]/15 text-[var(--accent-color)] font-medium'
                       : 'text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800/60 dark:hover:text-white'

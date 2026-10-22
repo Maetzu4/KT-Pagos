@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { Button } from './Button';
 
-export function Modal({ open, onClose, title, children, size = 'md' }) {
+export function Modal({ open, onClose, title, children, size = 'md', maxWidth }) {
   const overlayRef = useRef(null);
 
   useEffect(() => {
@@ -23,13 +23,14 @@ export function Modal({ open, onClose, title, children, size = 'md' }) {
   if (!open) return null;
 
   // Tailwind requiere clases completas y estáticas (no interpoladas) para incluirlas en el bundle.
-  const sizeClass = {
+  const sizeMap = {
     sm:   'max-w-sm',
     md:   'max-w-lg',
     lg:   'max-w-2xl',
     xl:   'max-w-4xl',
     full: 'w-[95vw] max-w-[1400px] h-[90vh] max-h-[90vh]',
-  }[size] ?? 'max-w-lg';
+  };
+  const sizeClass = maxWidth || (sizeMap[size] ?? 'max-w-lg');
 
   return createPortal(
     <div
