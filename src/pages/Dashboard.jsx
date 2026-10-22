@@ -39,6 +39,38 @@ function fmtFecha(str) {
   return `${d}/${m}/${y}`;
 }
 
+/**
+ * Extrae la hora formateada de una clase.
+ * Prioriza la hora en fecha_clase si existe (distinta de 00:00),
+ * o la extrae del campo horario de la clase o del grupo asociado.
+ */
+function getHoraClase(c, grupo) {
+  if (c?.fecha_clase) {
+    if (c.fecha_clase.includes('T')) {
+      const timePart = c.fecha_clase.split('T')[1];
+      if (timePart && timePart.length >= 5) {
+        const hhmm = timePart.slice(0, 5);
+        if (hhmm !== '00:00') return hhmm;
+      }
+    } else if (c.fecha_clase.includes(' ')) {
+      const timePart = c.fecha_clase.split(' ')[1];
+      if (timePart && timePart.length >= 5) {
+        const hhmm = timePart.slice(0, 5);
+        if (hhmm !== '00:00') return hhmm;
+      }
+    }
+  }
+
+  const rawHorario = c?.horario || grupo?.horario;
+  if (!rawHorario) return null;
+
+  // Buscar coincidencia HH:mm (ej. '16:30', '18:00')
+  const match = String(rawHorario).match(/\b([01]?\d|2[0-3]):[0-5]\d\b/);
+  if (match) return match[0];
+
+  return String(rawHorario).trim() || null;
+}
+
 // ─── Custom Tooltip (gráfica) ─────────────────────────────────────────────────
 function CustomTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
@@ -398,9 +430,11 @@ export default function Dashboard() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {pendientes.map((c) => {
-              const nombreGrupo = c.grupos?.nombre_grupo ?? grupos.find((g) => g.id === c.grupo_id)?.nombre_grupo ?? 'Grupo';
+              const grupo = c.grupos ?? grupos.find((g) => g.id === c.grupo_id);
+              const nombreGrupo = grupo?.nombre_grupo ?? 'Grupo';
               const tema = c.tema_clase ?? c.nombre_clase ?? 'Clase programada';
               const esAtrasada = c.fecha_clase < hoyStr;
+              const hora = getHoraClase(c, grupo);
 
               return (
                 <div
@@ -410,7 +444,7 @@ export default function Dashboard() {
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                       <span className="text-xs tabular-nums text-zinc-500 dark:text-zinc-400 font-medium">
-                        {fmtFecha(c.fecha_clase)}
+                        {fmtFecha(c.fecha_clase)}{hora ? ` · ${hora}` : ''}
                       </span>
                       {c.estado_clase === 'Aplazada' && (
                         <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[var(--accent-color)]/10 text-[var(--accent-color)]">

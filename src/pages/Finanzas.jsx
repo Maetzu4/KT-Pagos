@@ -1,7 +1,7 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   AlertTriangle, TrendingUp,
-  CheckCircle2, RotateCcw, Search, DollarSign,
+  CheckCircle2, RotateCcw, DollarSign,
   ChevronRight, Sparkles,
 } from 'lucide-react';
 import { MetricCard } from '../components/ui/Card';
@@ -15,11 +15,7 @@ import { formatDate } from '../lib/dateUtils';
 
 // ── Tarjeta compacta para la cuadrícula de periodos pasados ───────────────────
 function PeriodoCompactCard({ periodo, onClick }) {
-  const totalACobrar = periodo.total_a_cobrar ?? periodo.estimado_real ?? 0;
   const pagado = periodo.pagado_real || 0;
-  const errorPago = pagado - totalACobrar;
-  const errorPositivo = errorPago >= 0;
-  const tieneDeuda = (periodo.deuda_reclamos > 0) || (periodo.deuda_anterior > 0 && !periodo.deuda_resuelta);
 
   return (
     <div
@@ -37,35 +33,17 @@ function PeriodoCompactCard({ periodo, onClick }) {
           </p>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
-          {tieneDeuda && (
-            <span className="px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-500 text-[10px] font-bold uppercase tracking-wide flex items-center gap-1">
-              <AlertTriangle size={10} />
-              Deuda
-            </span>
-          )}
-          <ChevronRight size={14} className="text-zinc-400 group-hover:text-[var(--accent-color)] group-hover:translate-x-0.5 transition-all" />
+          <ChevronRight size={15} className="text-zinc-400 group-hover:text-[var(--accent-color)] group-hover:translate-x-0.5 transition-all" />
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-2 pt-3 border-t border-zinc-200/50 dark:border-zinc-700/40">
-        <div>
-          <p className="text-[10px] text-zinc-500 uppercase tracking-wide">Total</p>
-          <p className="text-sm font-mono font-semibold text-zinc-900 dark:text-white mt-0.5">
-            {formatCurrency(totalACobrar)}
-          </p>
-        </div>
-        <div>
-          <p className="text-[10px] text-zinc-500 uppercase tracking-wide">Pagado</p>
-          <p className="text-sm font-mono font-semibold text-[var(--accent-color)] mt-0.5">
-            {formatCurrency(pagado)}
-          </p>
-        </div>
-        <div>
-          <p className="text-[10px] text-zinc-500 uppercase tracking-wide">Diferencia</p>
-          <p className={`text-sm font-mono font-semibold mt-0.5 ${errorPositivo ? 'text-zinc-700 dark:text-zinc-300' : 'text-amber-500'}`}>
-            {errorPositivo ? '+' : ''}{formatCurrency(errorPago)}
-          </p>
-        </div>
+      <div className="pt-2.5 border-t border-zinc-200/50 dark:border-zinc-700/40 flex items-baseline justify-between">
+        <span className="text-xs font-medium text-zinc-500 uppercase tracking-wider">
+          Pagado
+        </span>
+        <span className="text-lg font-mono font-bold text-[var(--accent-color)]">
+          {formatCurrency(pagado)}
+        </span>
       </div>
     </div>
   );
@@ -76,120 +54,82 @@ export default function Finanzas() {
   const { periodos, loading, updatePeriodo, metricas, periodoActual } = usePeriodos();
 
   const [selectedPeriodo, setSelectedPeriodo] = useState(null);
-  const [search, setSearch] = useState('');
-  const [filtroAnio, setFiltroAnio] = useState('');
-  const [filtroMes, setFiltroMes] = useState('');
+
+  // ── Opciones de filtro de Año (estrictamente años numéricos válidos) ───────
+  const aniosDisponibles = useMemo(() => {
+    const set = new Set();
+    const currentYear = String(new Date().getFullYear());
+    set.add(currentYear);
+    periodos.forEach((p) => {
+      const anio = p.fecha_inicio?.slice(0, 4) || p.key_periodo?.slice(0, 4);
+      if (anio && /^\d{4}$/.test(anio)) set.add(anio);
+    });
+    const sorted = [...set].sort((a, b) => b.localeCompare(a));
+    return sorted.map((a) => ({ value: a, label: a }));
+  }, [periodos]);
+
+  // Año actual por defecto garantizado
+  const anioDefault = useMemo(() => {
+    return periodoActual?.key_periodo?.slice(0, 4) || (aniosDisponibles[0]?.value ?? String(new Date().getFullYear()));
+  }, [periodoActual, aniosDisponibles]);
+
+  const [filtroAnio, setFiltroAnio] = useState(anioDefault);
+
+  // Sincronizar y validar que filtroAnio sea siempre un año válido existente
+  useEffect(() => {
+    if (!filtroAnio || !aniosDisponibles.some((opt) => opt.value === filtroAnio)) {
+      if (aniosDisponibles.length > 0) {
+        setFiltroAnio(anioDefault);
+      }
+    }
+  }, [periodoActual, aniosDisponibles, filtroAnio, anioDefault]);
 
   // Totales animados (Total Estimado, Total Pagado, Total Arrastrado)
   const animEstimado = useCountUp(metricas?.totalEstimado ?? 0);
   const animPagado = useCountUp(metricas?.totalCobrado ?? metricas?.totalPagado ?? 0);
   const animRollover = useCountUp(metricas?.totalRollover ?? 0);
 
-  // ── Opciones de filtros Año y Mes ──────────────────────────────────────────
-  const aniosDisponibles = useMemo(() => {
-    const set = new Set();
-    periodos.forEach((p) => {
-      const anio = p.fecha_inicio?.slice(0, 4) || p.key_periodo?.slice(0, 4);
-      if (anio) set.add(anio);
-    });
-    return [
-      { value: '', label: 'Año (Todos)' },
-      ...[...set].sort((a, b) => b.localeCompare(a)).map((a) => ({ value: a, label: a })),
-    ];
-  }, [periodos]);
-
-  const MESES = [
-    { value: '', label: 'Mes (Todos)' },
-    { value: '01', label: 'Enero' }, { value: '02', label: 'Febrero' },
-    { value: '03', label: 'Marzo' }, { value: '04', label: 'Abril' },
-    { value: '05', label: 'Mayo' }, { value: '06', label: 'Junio' },
-    { value: '07', label: 'Julio' }, { value: '08', label: 'Agosto' },
-    { value: '09', label: 'Septiembre' }, { value: '10', label: 'Octubre' },
-    { value: '11', label: 'Noviembre' }, { value: '12', label: 'Diciembre' },
-  ];
-
-  // ── Filtrado combinado ────────────────────────────────────────────────────
+  // ── Filtrado por Año ───────────────────────────────────────────────────────
   const periodosFiltrados = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const anio = filtroAnio || anioDefault;
     return periodos.filter((p) => {
-      if (filtroAnio && !p.fecha_inicio?.startsWith(filtroAnio) && !p.key_periodo?.startsWith(filtroAnio)) return false;
-      if (filtroMes && p.fecha_inicio?.slice(5, 7) !== filtroMes && p.key_periodo?.slice(5, 7) !== filtroMes) return false;
-      if (q) {
-        const totalACobrar = String(p.total_a_cobrar ?? p.estimado_real ?? '');
-        const pagado = String(p.pagado_real ?? '');
-        const deuda = String(p.deuda_reclamos ?? '');
-        const notas = (p.notas_reclamo ?? '').toLowerCase();
-        const nombre = (p.nombre_periodo ?? '').toLowerCase();
-        return (
-          totalACobrar.includes(q) ||
-          pagado.includes(q) ||
-          deuda.includes(q) ||
-          notas.includes(q) ||
-          nombre.includes(q)
-        );
-      }
-      return true;
+      return (
+        p.fecha_inicio?.startsWith(anio) ||
+        p.key_periodo?.startsWith(anio)
+      );
     });
-  }, [periodos, search, filtroAnio, filtroMes]);
+  }, [periodos, filtroAnio, anioDefault]);
 
   // Derivar Periodo Hero (seleccionado o actual) y los demás periodos para el Grid
   const periodoHero = useMemo(() => {
     if (periodosFiltrados.length === 0) return null;
-    if (filtroAnio || filtroMes || search) {
-      return periodosFiltrados[0];
-    }
     const match = periodosFiltrados.find((p) => p.key_periodo === periodoActual?.key_periodo);
     return match || periodosFiltrados[0];
-  }, [periodosFiltrados, periodoActual, filtroAnio, filtroMes, search]);
+  }, [periodosFiltrados, periodoActual]);
 
   const periodosGrid = useMemo(() => {
     if (!periodoHero) return [];
     return periodosFiltrados.filter((p) => p.key_periodo !== periodoHero.key_periodo);
   }, [periodosFiltrados, periodoHero]);
 
-  const hayFiltros = Boolean(search || filtroAnio || filtroMes);
-
   return (
     <div className="space-y-8 animate-fade-in">
-      {/* ── Cabecera con Selectores de Año y Mes alineados a la derecha ── */}
+      {/* ── Cabecera con Único Selector de Año alineado a la derecha ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-zinc-900 dark:text-white">Finanzas</h1>
           <p className="text-sm text-zinc-500 mt-0.5">Cortes mensuales y seguimiento de pagos</p>
         </div>
 
-        {/* Selectores Año y Mes estilizados (CustomSelect) */}
-        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-          <div className="w-32 sm:w-36">
-            <CustomSelect
-              value={filtroAnio}
-              onChange={setFiltroAnio}
-              options={aniosDisponibles}
-              placeholder="Año"
-              className="bg-zinc-100 dark:bg-zinc-800/50 border-0 rounded-xl font-medium focus:ring-2 focus:ring-[var(--accent-color)] text-xs sm:text-sm"
-            />
-          </div>
-
-          <div className="w-36 sm:w-44">
-            <CustomSelect
-              value={filtroMes}
-              onChange={setFiltroMes}
-              options={MESES}
-              placeholder="Mes"
-              className="bg-zinc-100 dark:bg-zinc-800/50 border-0 rounded-xl font-medium focus:ring-2 focus:ring-[var(--accent-color)] text-xs sm:text-sm"
-            />
-          </div>
-
-          {hayFiltros && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => { setSearch(''); setFiltroAnio(''); setFiltroMes(''); }}
-              className="text-xs"
-            >
-              Limpiar
-            </Button>
-          )}
+        {/* Único Selector: Año */}
+        <div className="w-32 sm:w-36">
+          <CustomSelect
+            value={filtroAnio}
+            onChange={setFiltroAnio}
+            options={aniosDisponibles}
+            placeholder="Año"
+            className="bg-zinc-100 dark:bg-zinc-800/50 border-0 rounded-xl font-medium focus:ring-2 focus:ring-[var(--accent-color)] text-xs sm:text-sm"
+          />
         </div>
       </div>
 
@@ -215,26 +155,6 @@ export default function Finanzas() {
         />
       </div>
 
-      {/* ── Barra de Búsqueda ── */}
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="relative">
-          <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar por cifra o texto…"
-            className="h-10 pl-9 pr-4 w-64 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-800/50 border-0 text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] transition-all"
-          />
-        </div>
-
-        {hayFiltros && (
-          <span className="text-xs text-zinc-500">
-            {periodosFiltrados.length} de {periodos.length} periodos
-          </span>
-        )}
-      </div>
-
       {/* ── Contenido Principal (Hero + Grid) ── */}
       {loading ? (
         <div className="flex flex-col items-center justify-center py-20 gap-3">
@@ -243,14 +163,8 @@ export default function Finanzas() {
         </div>
       ) : periodosFiltrados.length === 0 ? (
         <div className="text-center py-20 bg-zinc-50 dark:bg-zinc-800/20 rounded-2xl p-6 text-zinc-500">
-          {hayFiltros ? (
-            <p className="text-sm">Sin periodos que coincidan con los filtros seleccionados.</p>
-          ) : (
-            <>
-              <p className="font-medium text-zinc-700 dark:text-zinc-300">No hay periodos con clases registradas aún.</p>
-              <p className="text-xs mt-1">Los periodos se generan automáticamente al programar o completar clases.</p>
-            </>
-          )}
+          <p className="font-medium text-zinc-700 dark:text-zinc-300">No hay periodos registrados para este año.</p>
+          <p className="text-xs mt-1">Los periodos se generan automáticamente al programar o completar clases.</p>
         </div>
       ) : (
         <div className="space-y-8">
@@ -374,7 +288,7 @@ export default function Finanzas() {
               <div className="flex items-center gap-2">
                 <Sparkles size={16} className="text-[var(--accent-color)]" />
                 <h3 className="text-sm font-semibold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
-                  Otros Cortes y Periodos ({periodosGrid.length})
+                  Otros Periodos
                 </h3>
               </div>
 
