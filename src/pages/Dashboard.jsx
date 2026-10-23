@@ -39,36 +39,63 @@ function fmtFecha(str) {
   return `${d}/${m}/${y}`;
 }
 
+/** Formatea 'YYYY-MM-DD' → 'Día DD/MM/YYYY' (ej. 'Jue 22/10/2026') */
+function fmtFechaConDia(str) {
+  if (!str) return '—';
+  const clean = str.split('T')[0].split(' ')[0];
+  const [y, m, d] = clean.split('-');
+  if (!y || !m || !d) return '—';
+
+  try {
+    const fechaObj = new Date(Number(y), Number(m) - 1, Number(d));
+    let diaSemana = new Intl.DateTimeFormat('es-ES', { weekday: 'short' }).format(fechaObj);
+    diaSemana = diaSemana.replace('.', '').trim();
+    diaSemana = diaSemana.charAt(0).toUpperCase() + diaSemana.slice(1);
+    return `${diaSemana} ${d}/${m}/${y}`;
+  } catch {
+    return `${d}/${m}/${y}`;
+  }
+}
+
 /**
  * Extrae la hora formateada de una clase.
  * Prioriza la hora en fecha_clase si existe (distinta de 00:00),
  * o la extrae del campo horario de la clase o del grupo asociado.
+ * Fallback seguro para evitar roturas si no hay hora en la BD.
  */
 function getHoraClase(c, grupo) {
-  if (c?.fecha_clase) {
-    if (c.fecha_clase.includes('T')) {
-      const timePart = c.fecha_clase.split('T')[1];
-      if (timePart && timePart.length >= 5) {
-        const hhmm = timePart.slice(0, 5);
-        if (hhmm !== '00:00') return hhmm;
-      }
-    } else if (c.fecha_clase.includes(' ')) {
-      const timePart = c.fecha_clase.split(' ')[1];
-      if (timePart && timePart.length >= 5) {
-        const hhmm = timePart.slice(0, 5);
-        if (hhmm !== '00:00') return hhmm;
+  try {
+    if (!c && !grupo) return null;
+
+    if (c?.fecha_clase) {
+      if (c.fecha_clase.includes('T')) {
+        const timePart = c.fecha_clase.split('T')[1];
+        if (timePart && timePart.length >= 5) {
+          const hhmm = timePart.slice(0, 5);
+          if (hhmm !== '00:00') return hhmm;
+        }
+      } else if (c.fecha_clase.includes(' ')) {
+        const timePart = c.fecha_clase.split(' ')[1];
+        if (timePart && timePart.length >= 5) {
+          const hhmm = timePart.slice(0, 5);
+          if (hhmm !== '00:00') return hhmm;
+        }
       }
     }
+
+    const rawHorario = c?.horario || grupo?.horario || c?.grupos?.horario;
+    if (!rawHorario) return null;
+
+    // Buscar coincidencia HH:mm (ej. '16:30', '18:00')
+    const match = String(rawHorario).match(/\b([01]?\d|2[0-3]):[0-5]\d\b/);
+    if (match) return match[0];
+
+    const trimmed = String(rawHorario).trim();
+    return trimmed || null;
+  } catch (err) {
+    console.error('Error al extraer hora de clase:', err);
+    return null;
   }
-
-  const rawHorario = c?.horario || grupo?.horario;
-  if (!rawHorario) return null;
-
-  // Buscar coincidencia HH:mm (ej. '16:30', '18:00')
-  const match = String(rawHorario).match(/\b([01]?\d|2[0-3]):[0-5]\d\b/);
-  if (match) return match[0];
-
-  return String(rawHorario).trim() || null;
 }
 
 // ─── Custom Tooltip (gráfica) ─────────────────────────────────────────────────
@@ -430,7 +457,7 @@ export default function Dashboard() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {pendientes.map((c) => {
-              const grupo = c.grupos ?? grupos.find((g) => g.id === c.grupo_id);
+              const grupo = grupos.find((g) => String(g.id) === String(c.grupo_id)) || c.grupos;
               const nombreGrupo = grupo?.nombre_grupo ?? 'Grupo';
               const tema = c.tema_clase ?? c.nombre_clase ?? 'Clase programada';
               const esAtrasada = c.fecha_clase < hoyStr;
@@ -444,7 +471,8 @@ export default function Dashboard() {
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                       <span className="text-xs tabular-nums text-zinc-500 dark:text-zinc-400 font-medium">
-                        {fmtFecha(c.fecha_clase)}{hora ? ` · ${hora}` : ''}
+                        {fmtFechaConDia(c.fecha_clase)}
+                        {hora && <span> · {hora}</span>}
                       </span>
                       {c.estado_clase === 'Aplazada' && (
                         <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[var(--accent-color)]/10 text-[var(--accent-color)]">
@@ -550,13 +578,15 @@ export default function Dashboard() {
         <h2 className="text-sm font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider mb-3">
           Grupos Activos
         </h2>
-        <Table
-          columns={colsGrupos}
-          data={gruposActivos}
-          loading={loadingGrupos}
-          emptyMessage="No hay grupos activos"
-          onRowClick={(g) => setDetalle(g)}
-        />
+        <div className="overflow-x-auto -mx-1 px-1">
+          <Table
+            columns={colsGrupos}
+            data={gruposActivos}
+            loading={loadingGrupos}
+            emptyMessage="No hay grupos activos"
+            onRowClick={(g) => setDetalle(g)}
+          />
+        </div>
       </section>
 
       {/* ── Modal de detalle del grupo (clic en fila) ── */}

@@ -286,48 +286,41 @@ export default function Bonos() {
             <Trophy size={20} className="text-[var(--accent-color)]" />
           </div>
           <div>
-            <div className="flex items-center gap-2.5 flex-wrap">
-              <h1 className="text-2xl font-semibold text-zinc-900 dark:text-white">Módulo de Bonos</h1>
-              <button
-                type="button"
-                onClick={() => setOpenSimulador(true)}
-                className="inline-flex items-center gap-1.5 border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800/80 rounded-lg px-3 py-1 text-xs sm:text-sm font-medium transition-colors cursor-pointer"
-              >
-                <Calculator size={14} className="text-[var(--accent-color)]" />
-                <span>Simulador Rápido</span>
-              </button>
-            </div>
+            <h1 className="text-2xl font-semibold text-zinc-900 dark:text-white">Módulo de Bonos</h1>
             <p className="text-sm text-zinc-500 mt-0.5">Gestiona tus retenciones y calcula el bono mensual</p>
           </div>
         </div>
 
-        {/* Selectores de Periodo con Badge ACTUAL a la izquierda de Año */}
-        <div className="flex items-center gap-2">
-          {isCurrentPeriod && (
-            <span className="px-2.5 py-1 rounded-md bg-[var(--accent-color)]/10 text-[var(--accent-color)] text-[10px] font-bold uppercase tracking-wider shrink-0 animate-fade-in">
-              Actual
-            </span>
-          )}
+        {/* Selectores de Periodo con Badge ACTUAL rígidamente alineados a la derecha */}
+        <div className="flex items-center justify-end gap-2 ml-auto w-full sm:w-auto shrink-0">
+          {/* Badge ACTUAL en contenedor de ancho fijo para evitar saltos de layout */}
+          <div className="w-14 shrink-0 flex items-center justify-end">
+            {isCurrentPeriod && (
+              <span className="px-2 py-0.5 rounded-md bg-[var(--accent-color)]/10 text-[var(--accent-color)] text-[10px] font-bold uppercase tracking-wider animate-fade-in">
+                Actual
+              </span>
+            )}
+          </div>
 
           {/* Año */}
-          <div className="w-28 sm:w-32">
+          <div className="w-24 sm:w-28 shrink-0">
             <CustomSelect
               value={selectedAnio}
               onChange={setSelectedAnio}
               options={aniosDisponibles}
               placeholder="Año"
-              className="bg-zinc-100 dark:bg-zinc-800/50 border-0 rounded-xl font-medium focus:ring-2 focus:ring-[var(--accent-color)]"
+              className="bg-zinc-100 dark:bg-zinc-800/50 border-0 rounded-xl font-medium focus:ring-2 focus:ring-[var(--accent-color)] text-xs sm:text-sm"
             />
           </div>
 
           {/* Mes */}
-          <div className="w-36 sm:w-44">
+          <div className="w-32 sm:w-36 shrink-0">
             <CustomSelect
               value={selectedMes}
               onChange={setSelectedMes}
               options={mesesDisponibles}
               placeholder="Mes"
-              className="bg-zinc-100 dark:bg-zinc-800/50 border-0 rounded-xl font-medium focus:ring-2 focus:ring-[var(--accent-color)]"
+              className="bg-zinc-100 dark:bg-zinc-800/50 border-0 rounded-xl font-medium focus:ring-2 focus:ring-[var(--accent-color)] text-xs sm:text-sm"
             />
           </div>
         </div>
@@ -507,6 +500,17 @@ export default function Bonos() {
                     ? <><CheckCircle2 size={16} className="mr-2" />¡Guardado!</>
                     : <><Save size={16} className="mr-2" />Guardar Bonos</>
                 }
+              </Button>
+
+              <Button
+                type="button"
+                variant="subtle"
+                size="sm"
+                onClick={() => setOpenSimulador(true)}
+                className="w-full justify-center text-xs rounded-xl"
+              >
+                <Calculator size={14} className="text-[var(--accent-color)] mr-1.5" />
+                Simulador Rápido
               </Button>
             </div>
           </div>

@@ -86,7 +86,7 @@ export function PeriodoModal({ periodo, open, onClose, onUpdate }) {
           </p>
 
           {/* ── Métricas Principales (Bloques sobrios sin bordes) ── */}
-          <div className="grid grid-cols-3 gap-3 text-center">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
             <div className="bg-zinc-50 dark:bg-zinc-800/40 rounded-2xl p-3.5">
               <p className="text-[10px] text-zinc-500 uppercase tracking-wide mb-1">Total a Cobrar</p>
               <p className="text-base sm:text-lg font-mono font-bold text-zinc-900 dark:text-white">
@@ -101,7 +101,7 @@ export function PeriodoModal({ periodo, open, onClose, onUpdate }) {
             </div>
             <div className="bg-zinc-50 dark:bg-zinc-800/40 rounded-2xl p-3.5">
               <p className="text-[10px] text-zinc-500 uppercase tracking-wide mb-1">Diferencia</p>
-              <p className={`text-base sm:text-lg font-mono font-bold ${errorPositivo ? 'text-zinc-900 dark:text-white' : 'text-amber-500'}`}>
+              <p className={`text-base sm:text-lg font-mono font-bold ${errorPositivo ? 'text-zinc-900 dark:text-white' : 'text-[var(--accent-color)]'}`}>
                 {errorPositivo ? '+' : ''}{formatCurrency(animDiferencia)}
               </p>
             </div>
@@ -143,7 +143,7 @@ export function PeriodoModal({ periodo, open, onClose, onUpdate }) {
                   <span>Subtotal Clases del Mes:</span>
                   <span>{formatCurrency(periodo.estimado_real)}</span>
                 </div>
-                <div className={`flex justify-between ${periodo.deuda_resuelta ? 'text-zinc-400 line-through' : 'text-amber-500 font-semibold'}`}>
+                <div className={`flex justify-between ${periodo.deuda_resuelta ? 'text-zinc-400 line-through' : 'text-[var(--accent-color)] font-semibold'}`}>
                   <span>+ Deuda Arrastrada:</span>
                   <span>+{formatCurrency(deudaAnterior)}</span>
                 </div>
@@ -188,12 +188,12 @@ export function PeriodoModal({ periodo, open, onClose, onUpdate }) {
             <div className="rounded-2xl bg-zinc-50 dark:bg-zinc-800/40 p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <AlertTriangle size={15} className="text-amber-500" />
-                  <span className="text-xs font-semibold text-amber-500 uppercase tracking-wide">
+                  <AlertTriangle size={15} className="text-[var(--accent-color)]" />
+                  <span className="text-xs font-semibold text-[var(--accent-color)] uppercase tracking-wide">
                     Deuda por Reclamos
                   </span>
                 </div>
-                <span className="text-sm font-mono font-bold text-amber-500">
+                <span className="text-sm font-mono font-bold text-[var(--accent-color)]">
                   {formatCurrency(periodo.deuda_reclamos)}
                 </span>
               </div>
@@ -209,7 +209,7 @@ export function PeriodoModal({ periodo, open, onClose, onUpdate }) {
                       className="w-full text-left flex justify-between items-center text-xs text-zinc-800 dark:text-zinc-300 bg-white/70 dark:bg-zinc-900/60 rounded-xl px-3 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
                     >
                       <span className="truncate">{c.nombre_clase || formatDate(c.fecha_clase) || 'Clase sin nombre'}</span>
-                      <span className="font-mono text-amber-500 ml-2 shrink-0">{formatCurrency(c.precio_cobrado)}</span>
+                      <span className="font-mono text-[var(--accent-color)] ml-2 shrink-0">{formatCurrency(c.precio_cobrado)}</span>
                     </button>
                   ))}
                 </div>

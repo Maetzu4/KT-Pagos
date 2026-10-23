@@ -164,55 +164,46 @@ export function GrupoDetailModal({ grupo, open, onClose, onEdit, onClassUpdate }
       <Modal open={open} onClose={onClose} title={grupo.nombre_grupo} size="lg">
         <div className="space-y-5">
 
-          {/* ── Resumen del grupo ── */}
-          <div className="grid grid-cols-3 gap-3">
-            <div className="col-span-3 sm:col-span-1 flex items-center gap-2 px-3 py-2.5
-                            rounded-xl bg-zinc-50 dark:bg-zinc-800/40
-                            border border-zinc-200 dark:border-zinc-700/60">
-              <Clock size={14} className="text-zinc-400 shrink-0" />
-              <div className="min-w-0">
-                <p className="text-[10px] text-zinc-500 uppercase tracking-wide">Horario</p>
-                <p className="text-sm font-medium text-zinc-900 dark:text-white truncate">
-                  {grupo.horario ?? '—'}
-                </p>
+          {/* ── Sección superior responsiva (Horario, Progreso, Acciones) ── */}
+          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between w-full">
+            {/* Resumen del grupo (Horario, Inicio, Progreso) */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full sm:flex-1">
+              <div className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-700/60">
+                <Clock size={14} className="text-zinc-400 shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-[10px] text-zinc-500 uppercase tracking-wide">Horario</p>
+                  <p className="text-sm font-medium text-zinc-900 dark:text-white truncate">
+                    {grupo.horario ?? '—'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-700/60">
+                <Calendar size={14} className="text-zinc-400 shrink-0" />
+                <div>
+                  <p className="text-[10px] text-zinc-500 uppercase tracking-wide">Inicio</p>
+                  <p className="text-sm font-medium text-zinc-900 dark:text-white">
+                    {fmtFecha(grupo.fecha_inicio_grupo)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-700/60">
+                <div className="w-full">
+                  <p className="text-[10px] text-zinc-500 uppercase tracking-wide mb-0.5">Progreso</p>
+                  <p className="text-sm font-semibold text-zinc-900 dark:text-white">
+                    {completadas}
+                    <span className="font-normal text-zinc-500"> / {clases.length} clases</span>
+                  </p>
+                </div>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl
-                            bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-700/60">
-              <Calendar size={14} className="text-zinc-400 shrink-0" />
-              <div>
-                <p className="text-[10px] text-zinc-500 uppercase tracking-wide">Inicio</p>
-                <p className="text-sm font-medium text-zinc-900 dark:text-white">
-                  {fmtFecha(grupo.fecha_inicio_grupo)}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl
-                            bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-700/60">
-              <div className="w-full">
-                <p className="text-[10px] text-zinc-500 uppercase tracking-wide mb-0.5">Progreso</p>
-                <p className="text-sm font-semibold text-zinc-900 dark:text-white">
-                  {completadas}
-                  <span className="font-normal text-zinc-500"> / {clases.length} clases</span>
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* ── Acciones de cabecera ── */}
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-zinc-500">
-              <span className="font-semibold text-zinc-900 dark:text-white">{clases.length}</span> clases
-              {programadas > 0 && (
-                <> · <span className="text-[var(--accent-color)]">{programadas} programadas</span></>
-              )}
-            </p>
-            <div className="flex items-center gap-2">
+            {/* Acciones (Backoffice, Añadir Clase Extra) */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto shrink-0">
               {grupo.link_bo && (
-                <a href={grupo.link_bo} target="_blank" rel="noreferrer">
-                  <Button size="sm" variant="ghost" id={`btn-bo-${grupo.id}`}>
+                <a href={grupo.link_bo} target="_blank" rel="noreferrer" className="w-full sm:w-auto">
+                  <Button size="sm" variant="ghost" id={`btn-bo-${grupo.id}`} className="w-full sm:w-auto justify-center">
                     <ExternalLink size={13} /> Backoffice
                   </Button>
                 </a>
@@ -221,10 +212,21 @@ export function GrupoDetailModal({ grupo, open, onClose, onEdit, onClassUpdate }
                 size="sm"
                 id={`btn-add-clase-extra-${grupo.id}`}
                 onClick={() => setIsExtraModalOpen(true)}
+                className="w-full sm:w-auto justify-center"
               >
                 <Plus size={14} /> Añadir Clase Extra
               </Button>
             </div>
+          </div>
+
+          {/* ── Conteo de clases ── */}
+          <div className="flex items-center justify-between text-xs text-zinc-500">
+            <p>
+              <span className="font-semibold text-zinc-900 dark:text-white">{clases.length}</span> clases
+              {programadas > 0 && (
+                <> · <span className="text-[var(--accent-color)]">{programadas} programadas</span></>
+              )}
+            </p>
           </div>
 
           {/* ── Filtros de clases ── */}

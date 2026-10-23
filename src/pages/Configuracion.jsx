@@ -151,13 +151,22 @@ export default function Configuracion() {
       if (errC) throw new Error(`Error en clases: ${errC.message}`);
 
       const backupObj = {
-        version: 2,
+        version: 3,
         fecha: new Date().toISOString(),
         user_id: user.id,
         tarifas: tarifasData || [],
         grupos: gruposData || [],
-        periodos: periodosData || [],
-        clases: clasesData || [],
+        periodos: (periodosData || []).map((p) => ({
+          ...p,
+          requisitos_bono:  p.requisitos_bono  ?? false,
+          r1_grado:         p.r1_grado         ?? 'none',
+          r2_grado:         p.r2_grado         ?? 'none',
+          r3_grado:         p.r3_grado         ?? 'none',
+        })),
+        clases: (clasesData || []).map((c) => ({
+          ...c,
+          fue_aplazada: c.fue_aplazada ?? false,
+        })),
       };
 
       const blob = new Blob([JSON.stringify(backupObj, null, 2)], {
@@ -221,7 +230,11 @@ export default function Configuracion() {
           const { clases: _c, ...rest } = p;
           return {
             ...rest,
-            user_id: user.id,
+            user_id:          user.id,
+            requisitos_bono:  typeof rest.requisitos_bono === 'boolean' ? rest.requisitos_bono : false,
+            r1_grado:         ['none','good','amazing'].includes(rest.r1_grado) ? rest.r1_grado : 'none',
+            r2_grado:         ['none','good','amazing'].includes(rest.r2_grado) ? rest.r2_grado : 'none',
+            r3_grado:         ['none','good','amazing'].includes(rest.r3_grado) ? rest.r3_grado : 'none',
           };
         });
         const { error: pErr } = await supabase.from('periodos').upsert(cleanPeriodos);
@@ -234,7 +247,8 @@ export default function Configuracion() {
           const { grupos: _g, periodos: _p, ...rest } = c;
           return {
             ...rest,
-            user_id: user.id,
+            user_id:      user.id,
+            fue_aplazada: typeof rest.fue_aplazada === 'boolean' ? rest.fue_aplazada : false,
           };
         });
         // Upsert en lotes para garantizar estabilidad

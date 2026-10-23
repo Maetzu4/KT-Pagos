@@ -11,7 +11,7 @@ export function useClases(filtros = {}) {
     setError(null);
     let query = supabase
       .from('clases')
-      .select(`*, grupos(nombre_grupo, tarifa_id, tarifas(*))`)
+      .select(`*, grupos(nombre_grupo, horario, tarifa_id, tarifas(*))`)
       .order('fecha_clase', { ascending: false });
 
     if (filtros.grupo_id) query = query.eq('grupo_id', filtros.grupo_id);

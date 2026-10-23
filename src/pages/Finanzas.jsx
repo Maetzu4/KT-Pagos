@@ -114,15 +114,15 @@ export default function Finanzas() {
 
   return (
     <div className="space-y-8 animate-fade-in">
-      {/* ── Cabecera con Único Selector de Año alineado a la derecha ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      {/* ── Cabecera con Único Selector de Año en la misma fila horizontal ── */}
+      <div className="flex flex-row justify-between items-start gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-zinc-900 dark:text-white">Finanzas</h1>
           <p className="text-sm text-zinc-500 mt-0.5">Cortes mensuales y seguimiento de pagos</p>
         </div>
 
         {/* Único Selector: Año */}
-        <div className="w-32 sm:w-36">
+        <div className="w-28 sm:w-36 shrink-0">
           <CustomSelect
             value={filtroAnio}
             onChange={setFiltroAnio}
@@ -172,7 +172,7 @@ export default function Finanzas() {
           {periodoHero && (
             <div className="rounded-2xl bg-zinc-50 dark:bg-zinc-800/40 p-6 sm:p-7 space-y-6">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="flex items-center gap-2.5 flex-wrap">
+                <div className="flex flex-wrap items-center gap-3">
                   <h2 className="text-xl sm:text-2xl font-bold text-zinc-900 dark:text-white">
                     {periodoHero.nombre_periodo}
                   </h2>
@@ -181,12 +181,6 @@ export default function Finanzas() {
                       Periodo Actual
                     </span>
                   )}
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <span className="text-xs text-zinc-500">
-                    {formatDate(periodoHero.fecha_inicio)} — {formatDate(periodoHero.fecha_fin)}
-                  </span>
                   <Button
                     size="sm"
                     onClick={() => setSelectedPeriodo(periodoHero)}
@@ -195,6 +189,10 @@ export default function Finanzas() {
                     Ver detalles del corte
                   </Button>
                 </div>
+
+                <span className="text-xs text-zinc-500">
+                  {formatDate(periodoHero.fecha_inicio)} — {formatDate(periodoHero.fecha_fin)}
+                </span>
               </div>
 
               {/* Cifras Principales del Hero */}
@@ -217,7 +215,7 @@ export default function Finanzas() {
                   </div>
                   <div>
                     <p className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Diferencia</p>
-                    <p className={`text-xl sm:text-2xl font-bold font-mono ${((periodoHero.pagado_real || 0) - (periodoHero.total_a_cobrar ?? periodoHero.estimado_real)) >= 0 ? 'text-zinc-900 dark:text-zinc-200' : 'text-amber-500'}`}>
+                    <p className={`text-xl sm:text-2xl font-bold font-mono ${((periodoHero.pagado_real || 0) - (periodoHero.total_a_cobrar ?? periodoHero.estimado_real)) >= 0 ? 'text-zinc-900 dark:text-zinc-200' : 'text-[var(--accent-color)]'}`}>
                       {((periodoHero.pagado_real || 0) - (periodoHero.total_a_cobrar ?? periodoHero.estimado_real)) >= 0 ? '+' : ''}
                       {formatCurrency((periodoHero.pagado_real || 0) - (periodoHero.total_a_cobrar ?? periodoHero.estimado_real))}
                     </p>
@@ -253,7 +251,7 @@ export default function Finanzas() {
                   <p className="text-xs text-zinc-500 mb-1">Deuda Arrastrada</p>
                   <p className="text-base sm:text-lg font-semibold font-mono text-zinc-900 dark:text-white">
                     {periodoHero.deuda_anterior > 0 ? (
-                      <span className={periodoHero.deuda_resuelta ? 'line-through opacity-60 text-zinc-400' : 'text-amber-500'}>
+                      <span className={periodoHero.deuda_resuelta ? 'line-through opacity-60 text-zinc-400' : 'text-[var(--accent-color)]'}>
                         {formatCurrency(periodoHero.deuda_anterior)}
                       </span>
                     ) : (
@@ -272,8 +270,8 @@ export default function Finanzas() {
                       </>
                     ) : (
                       <>
-                        <AlertTriangle size={16} className="text-amber-500" />
-                        <span className="text-sm font-semibold text-amber-600 dark:text-amber-400">Diferencia Pendiente</span>
+                        <AlertTriangle size={16} className="text-[var(--accent-color)]" />
+                        <span className="text-sm font-semibold text-[var(--accent-color)]">Diferencia Pendiente</span>
                       </>
                     )}
                   </div>
