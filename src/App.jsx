@@ -71,7 +71,7 @@ export default function App() {
             path="/*"
             element={
               <ProtectedRoute session={session}>
-                <Layout>
+                <Layout key={session?.user?.id}>
                   <Routes>
                     <Route path="/"              element={<Dashboard />} />
                     <Route path="/grupos"        element={<Grupos />} />

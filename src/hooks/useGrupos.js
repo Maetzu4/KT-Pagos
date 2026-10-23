@@ -13,6 +13,12 @@ export function useGrupos() {
   const fetchGrupos = useCallback(async () => {
     setLoading(true);
     setError(null);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      setGrupos([]);
+      setLoading(false);
+      return;
+    }
     const { data, error: err } = await supabase
       .from('grupos')
       .select(`
@@ -22,6 +28,7 @@ export function useGrupos() {
         duracion_minutos, lecciones_totales,
         tarifa_id, user_id
       `)
+      .eq('user_id', user.id)
       .order('nombre_grupo', { ascending: true });
     if (err) { setError(err.message); setLoading(false); return; }
     setGrupos(data || []);

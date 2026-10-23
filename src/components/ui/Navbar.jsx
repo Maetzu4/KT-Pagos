@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Users, BarChart3, Settings, LogOut, Trophy } from 'lucide-react';
+import { LayoutDashboard, Users, BarChart3, Settings, LogOut, Trophy, User } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { useTheme } from '../../context/ThemeContext';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -17,6 +17,13 @@ const NAV_ITEMS = [
 export function Navbar() {
   const { mode } = useTheme();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [userEmail, setUserEmail] = useState(null);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) setUserEmail(user.email);
+    });
+  }, []);
 
   return (
     <>
@@ -50,8 +57,16 @@ export function Navbar() {
           ))}
         </div>
 
-        {/* Botón Logout (Desktop) */}
-        <div className="mt-auto px-2">
+        {/* Cuenta + Botón Logout (Desktop) */}
+        <div className="mt-auto px-2 space-y-1">
+          {userEmail && (
+            <div className="hidden lg:flex items-center gap-2 px-3 py-2 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 mb-1">
+              <div className="w-6 h-6 rounded-full bg-[var(--accent-color)]/20 flex items-center justify-center shrink-0">
+                <User size={12} className="text-[var(--accent-color)]" />
+              </div>
+              <span className="text-xs text-zinc-500 dark:text-zinc-400 truncate" title={userEmail}>{userEmail}</span>
+            </div>
+          )}
           <button
             onClick={() => setShowLogoutConfirm(true)}
             className={cn(

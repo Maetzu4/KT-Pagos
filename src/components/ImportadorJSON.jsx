@@ -196,36 +196,37 @@ export function ImportadorJSON() {
       }
 
       // ── FASE 0: Validación Previa (Protección contra duplicados) ─────────
-      const arrayDeIds = Array.from(
-        new Set(
-          grupos
-            .map((g) => getIdExterno(g))
-            .filter(Boolean)
-        )
+      // Consultar TODOS los grupos existentes para no duplicar ni violar grupos_id_externo_key
+      const { data: existentesDB, error: existErr } = await supabase
+        .from('grupos')
+        .select('id, id_externo, nombre_grupo')
+        .eq('user_id', user.id);
+
+      if (existErr) throw new Error(existErr.message);
+
+      const setExistentesPorIdExt = new Set(
+        (existentesDB || []).map((e) => e.id_externo).filter(Boolean)
+      );
+      const setExistentesPorNombre = new Set(
+        (existentesDB || []).map((e) => e.nombre_grupo).filter(Boolean)
       );
 
-      let setExistentes = new Set();
-      if (arrayDeIds.length > 0) {
-        const { data: existentes, error: existErr } = await supabase
-          .from('grupos')
-          .select('id_externo')
-          .in('id_externo', arrayDeIds);
-
-        if (existErr) throw new Error(existErr.message);
-        setExistentes = new Set(
-          (existentes || []).map((e) => e.id_externo).filter(Boolean)
-        );
-      }
-
-      // Separar el flujo en gruposNuevos y gruposOmitidos
+      // Separar el flujo en gruposNuevos y gruposOmitidos (la información existente no se modifica)
       const gruposNuevos = [];
       const gruposOmitidos = [];
 
       for (const g of grupos) {
         const idExt = getIdExterno(g);
-        if (idExt && setExistentes.has(idExt)) {
+        const mapped = mapGrupo(g, user.id);
+        const yaExiste = (idExt && setExistentesPorIdExt.has(idExt))
+          || (mapped.nombre_grupo && setExistentesPorNombre.has(mapped.nombre_grupo));
+
+        if (yaExiste) {
           gruposOmitidos.push(g);
         } else {
+          // Registrar en los sets locales para evitar duplicados dentro del mismo JSON
+          if (idExt) setExistentesPorIdExt.add(idExt);
+          if (mapped.nombre_grupo) setExistentesPorNombre.add(mapped.nombre_grupo);
           gruposNuevos.push(g);
         }
       }
@@ -248,49 +249,65 @@ export function ImportadorJSON() {
       const { data: tarifasDB, error: tarifasErr } = await supabase
         .from('tarifas')
         .select('id, duracion_minutos')
+        .eq('user_id', user.id)
         .order('duracion_minutos', { ascending: true });
 
       if (tarifasErr) console.error('Error cargando tarifas:', tarifasErr);
       const tarifas        = tarifasDB ?? [];
       const tarifaFallback = tarifas[0] ?? null;
 
-      // ── FASE 1: Inserción de grupos NUEVOS (con tarifa_id cruzada) ────────
+      // ── FASE 1: Inserción de grupos estrictamente NUEVOS ───────────────────
       let gruposOk = 0;
       let gruposErr = 0;
       const erroresGrupos = [];
       const gruposInsertados = [];
 
       for (const g of gruposNuevos) {
-        const payload = mapGrupo(g, user.id);
-
-        // Cruce automático de tarifa por duración del curso
+        const raw = mapGrupo(g, user.id);
         const tarifaMatch = tarifas.find(t => t.duracion_minutos === g.curso?.duracionMinutos)
           ?? tarifaFallback;
-        payload.tarifa_id = tarifaMatch?.id ?? null;
 
-        const conflictCol = payload.id_externo ? 'id_externo' : undefined;
-        console.log('Payload grupo nuevo:', payload);
+        const payload = {
+          user_id: user.id,
+          nombre_grupo: raw.nombre_grupo,
+          estado: raw.estado || 'activo',
+          id_externo: raw.id_externo ?? null,
+          fecha_inicio_grupo: raw.fecha_inicio_grupo ?? null,
+          horario: raw.horario ?? null,
+          link_bo: raw.link_bo ?? null,
+          curso_codigo: raw.curso_codigo ?? null,
+          curso_nombre: raw.curso_nombre ?? null,
+          duracion_minutos: raw.duracion_minutos != null ? Number(raw.duracion_minutos) : null,
+          lecciones_totales: raw.lecciones_totales != null ? Number(raw.lecciones_totales) : null,
+          tarifa_id: tarifaMatch?.id ?? null,
+        };
+
+        delete payload.id;
 
         try {
-          let data;
-          if (conflictCol) {
-            ({ data } = await supabase
-              .from('grupos')
-              .upsert(payload, { onConflict: conflictCol, ignoreDuplicates: false })
-              .select('id, nombre_grupo, user_id, fecha_inicio_grupo, lecciones_totales, horario, duracion_minutos, tarifa_id')
-              .throwOnError());
-          } else {
-            ({ data } = await supabase
-              .from('grupos')
-              .insert(payload)
-              .select('id, nombre_grupo, user_id, fecha_inicio_grupo, lecciones_totales, horario, duracion_minutos, tarifa_id')
-              .throwOnError());
+          const { data: fila, error: saveErr } = await supabase
+            .from('grupos')
+            .insert(payload)
+            .select('id, nombre_grupo, user_id, fecha_inicio_grupo, lecciones_totales, horario, duracion_minutos, tarifa_id')
+            .single();
+
+          if (saveErr) {
+            // Si ya existe en la base de datos (clave duplicada o conflicto de id_externo), omitir limpiamente
+            if (saveErr.code === '23505' || saveErr.message?.includes('unique constraint') || saveErr.message?.includes('duplicate key')) {
+              gruposOmitidos.push(g);
+              continue;
+            }
+            throw saveErr;
           }
-          const fila = Array.isArray(data) ? data[0] : data;
+
           if (fila) gruposInsertados.push(fila);
           gruposOk++;
         } catch (err) {
-          console.error('Error insertando grupo:', err);
+          if (err.code === '23505' || err.message?.includes('unique constraint') || err.message?.includes('duplicate key')) {
+            gruposOmitidos.push(g);
+            continue;
+          }
+          console.error('Error insertando grupo nuevo:', err);
           gruposErr++;
           erroresGrupos.push(`"${payload.nombre_grupo}": ${err.message}`);
         }
@@ -310,7 +327,10 @@ export function ImportadorJSON() {
           continue;
         }
         try {
-          const lote = generarClasesParaGrupo(grupo);
+          const lote = generarClasesParaGrupo({
+            ...grupo,
+            user_id: user.id, // Forzar inyección de user_id en el generador
+          });
           console.log(`Clases generadas para "${grupo.nombre_grupo}":`, lote.length);
           todasLasClases.push(...lote);
         } catch (err) {
@@ -324,14 +344,27 @@ export function ImportadorJSON() {
 
       if (todasLasClases.length > 0) {
         console.log('Enviando a Supabase...');
+        // Inyección obligatoria de user.id en cada clase antes de insertar con objeto estrictamente plano
+        const clasesToInsert = todasLasClases.map((c) => ({
+          user_id: user.id,
+          grupo_id: c.grupo_id,
+          fecha_clase: c.fecha_clase,
+          estado_clase: c.estado_clase || 'Programada',
+          es_adicional: typeof c.es_adicional === 'boolean' ? c.es_adicional : false,
+          tema_clase: c.tema_clase ?? null,
+          nombre_clase: c.nombre_clase ?? null,
+          precio_cobrado: c.precio_cobrado != null ? Number(c.precio_cobrado) : null,
+          periodo_id: c.periodo_id ?? null,
+        }));
+
         const CHUNK = 100;
-        for (let i = 0; i < todasLasClases.length; i += CHUNK) {
-          await supabase
+        for (let i = 0; i < clasesToInsert.length; i += CHUNK) {
+          const { error: cErr } = await supabase
             .from('clases')
-            .insert(todasLasClases.slice(i, i + CHUNK))
-            .throwOnError();
+            .insert(clasesToInsert.slice(i, i + CHUNK));
+          if (cErr) throw new Error(`Error insertando clases: ${cErr.message}`);
         }
-        clasesOk = todasLasClases.length;
+        clasesOk = clasesToInsert.length;
         console.log('Clases insertadas correctamente:', clasesOk);
       }
 
@@ -569,10 +602,12 @@ export function ImportadorJSON() {
       {/* ── SUCCESS ── */}
       {step === STEP.SUCCESS && (
         <div className="space-y-4">
-          <div className="flex gap-3 p-4 rounded-xl
-                          border border-[var(--accent-color)]/30
-                          bg-[var(--accent-color)]/10">
-            <CheckCircle2 size={18} className="shrink-0 mt-0.5 text-[var(--accent-color)]" />
+          <div className="flex gap-3 p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/40">
+            {results.gruposErr > 0 && results.gruposOk === 0 ? (
+              <AlertCircle size={18} className="shrink-0 mt-0.5 text-amber-500 dark:text-amber-400" />
+            ) : (
+              <CheckCircle2 size={18} className="shrink-0 mt-0.5 text-[var(--accent-color)]" />
+            )}
             <div>
               <p className="text-sm font-semibold text-zinc-900 dark:text-white">
                 {results.gruposOk === 0 && (results.gruposOmitidos || 0) > 0

@@ -9,9 +9,16 @@ export function useTarifas() {
   const fetchTarifas = useCallback(async () => {
     setLoading(true);
     setError(null);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      setTarifas([]);
+      setLoading(false);
+      return;
+    }
     const { data, error: err } = await supabase
       .from('tarifas')
       .select('*')
+      .eq('user_id', user.id)
       .order('duracion_minutos', { ascending: true });
     if (err) setError(err.message);
     else setTarifas(data || []);

@@ -15,7 +15,8 @@ import { formatDate } from '../lib/dateUtils';
 
 // ── Tarjeta compacta para la cuadrícula de periodos pasados ───────────────────
 function PeriodoCompactCard({ periodo, onClick }) {
-  const pagado = periodo.pagado_real || 0;
+  const pagado = Number(periodo?.pagado_real || 0);
+  const animPagado = useCountUp(pagado);
 
   return (
     <div
@@ -42,7 +43,7 @@ function PeriodoCompactCard({ periodo, onClick }) {
           Pagado
         </span>
         <span className="text-lg font-mono font-bold text-[var(--accent-color)]">
-          {formatCurrency(pagado)}
+          {formatCurrency(animPagado)}
         </span>
       </div>
     </div>
@@ -84,7 +85,7 @@ export default function Finanzas() {
     }
   }, [periodoActual, aniosDisponibles, filtroAnio, anioDefault]);
 
-  // Totales animados (Total Estimado, Total Pagado, Total Arrastrado)
+  // Totales globales animados (Total Estimado, Total Pagado, Total Arrastrado)
   const animEstimado = useCountUp(metricas?.totalEstimado ?? 0);
   const animPagado = useCountUp(metricas?.totalCobrado ?? metricas?.totalPagado ?? 0);
   const animRollover = useCountUp(metricas?.totalRollover ?? 0);
@@ -111,6 +112,22 @@ export default function Finanzas() {
     if (!periodoHero) return [];
     return periodosFiltrados.filter((p) => p.key_periodo !== periodoHero.key_periodo);
   }, [periodosFiltrados, periodoHero]);
+
+  // Valores numéricos del Hero para useCountUp
+  const heroTotalACobrar = Number(periodoHero ? (periodoHero.total_a_cobrar ?? periodoHero.estimado_real ?? 0) : 0);
+  const heroPagadoReal = Number(periodoHero?.pagado_real ?? 0);
+  const heroDiferencia = heroPagadoReal - heroTotalACobrar;
+  const heroClases = Number(periodoHero?.clases?.length ?? 0);
+  const heroMontoBono = Number(periodoHero?.monto_bono ?? 0);
+  const heroDeudaAnterior = Number(periodoHero?.deuda_anterior ?? 0);
+
+  // Animaciones useCountUp del Hero
+  const animHeroTotal = useCountUp(loading ? 0 : heroTotalACobrar);
+  const animHeroPagado = useCountUp(loading ? 0 : heroPagadoReal);
+  const animHeroDiferencia = useCountUp(loading ? 0 : heroDiferencia);
+  const animHeroClases = useCountUp(loading ? 0 : heroClases);
+  const animHeroBono = useCountUp(loading ? 0 : heroMontoBono);
+  const animHeroDeuda = useCountUp(loading ? 0 : heroDeudaAnterior);
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -202,7 +219,7 @@ export default function Finanzas() {
                     Total Proyectado / A Cobrar
                   </p>
                   <p className="text-3xl sm:text-4xl font-bold font-mono text-zinc-900 dark:text-white">
-                    {formatCurrency(periodoHero.total_a_cobrar ?? periodoHero.estimado_real)}
+                    {formatCurrency(animHeroTotal)}
                   </p>
                 </div>
 
@@ -210,14 +227,14 @@ export default function Finanzas() {
                   <div>
                     <p className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Ganado / Pagado</p>
                     <p className="text-xl sm:text-2xl font-bold font-mono text-[var(--accent-color)]">
-                      {formatCurrency(periodoHero.pagado_real)}
+                      {formatCurrency(animHeroPagado)}
                     </p>
                   </div>
                   <div>
                     <p className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Diferencia</p>
-                    <p className={`text-xl sm:text-2xl font-bold font-mono ${((periodoHero.pagado_real || 0) - (periodoHero.total_a_cobrar ?? periodoHero.estimado_real)) >= 0 ? 'text-zinc-900 dark:text-zinc-200' : 'text-[var(--accent-color)]'}`}>
-                      {((periodoHero.pagado_real || 0) - (periodoHero.total_a_cobrar ?? periodoHero.estimado_real)) >= 0 ? '+' : ''}
-                      {formatCurrency((periodoHero.pagado_real || 0) - (periodoHero.total_a_cobrar ?? periodoHero.estimado_real))}
+                    <p className={`text-xl sm:text-2xl font-bold font-mono ${heroDiferencia >= 0 ? 'text-zinc-900 dark:text-zinc-200' : 'text-[var(--accent-color)]'}`}>
+                      {animHeroDiferencia >= 0 ? '+' : ''}
+                      {formatCurrency(animHeroDiferencia)}
                     </p>
                   </div>
                 </div>
@@ -228,7 +245,7 @@ export default function Finanzas() {
                 <div className="rounded-xl bg-white/70 dark:bg-zinc-900/50 p-3.5 text-left">
                   <p className="text-xs text-zinc-500 mb-1">Clases Impartidas</p>
                   <p className="text-base sm:text-lg font-semibold font-mono text-zinc-900 dark:text-white">
-                    {periodoHero.clases?.length || 0}
+                    {Math.round(animHeroClases)}
                     <span className="text-xs font-normal text-zinc-400 ml-1.5 font-sans">
                       ({periodoHero.clases?.filter(c => !c.es_adicional).length || 0} reg · {periodoHero.clases?.filter(c => c.es_adicional).length || 0} ext)
                     </span>
@@ -238,7 +255,7 @@ export default function Finanzas() {
                 <div className="rounded-xl bg-white/70 dark:bg-zinc-900/50 p-3.5 text-left">
                   <p className="text-xs text-zinc-500 mb-1">Bono Aplicado</p>
                   <p className="text-base sm:text-lg font-semibold font-mono text-zinc-900 dark:text-white">
-                    {formatCurrency(periodoHero.monto_bono || 0)}
+                    {formatCurrency(animHeroBono)}
                     {periodoHero.multiplicador_bono > 0 && (
                       <span className="text-xs text-[var(--accent-color)] font-sans ml-1 font-bold">
                         (+{(periodoHero.multiplicador_bono * 100).toFixed(0)}%)
@@ -252,7 +269,7 @@ export default function Finanzas() {
                   <p className="text-base sm:text-lg font-semibold font-mono text-zinc-900 dark:text-white">
                     {periodoHero.deuda_anterior > 0 ? (
                       <span className={periodoHero.deuda_resuelta ? 'line-through opacity-60 text-zinc-400' : 'text-[var(--accent-color)]'}>
-                        {formatCurrency(periodoHero.deuda_anterior)}
+                        {formatCurrency(animHeroDeuda)}
                       </span>
                     ) : (
                       '—'

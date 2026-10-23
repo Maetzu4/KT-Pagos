@@ -18,6 +18,13 @@ export function usePeriodos() {
     setError(null);
 
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setPeriodos([]);
+        setLoading(false);
+        return;
+      }
+
       // 1. Fetch a clases donde estado_clase === 'Completada' trayendo grupos y tarifas
       const [
         { data: clasesData, error: clasesErr },
@@ -35,6 +42,7 @@ export function usePeriodos() {
             nombre_clase,
             es_adicional,
             grupo_id,
+            user_id,
             grupos (
               id,
               nombre_grupo,
@@ -47,12 +55,14 @@ export function usePeriodos() {
               )
             )
           `)
+          .eq('user_id', user.id)
           .eq('estado_clase', 'Completada')
           .order('fecha_clase', { ascending: false }),
 
         supabase
           .from('periodos')
           .select('id, user_id, mes, anio, key_periodo, pagado_real, notas_reclamo, arrastrado, requisitos_bono, r1_grado, r2_grado, r3_grado')
+          .eq('user_id', user.id)
           .order('key_periodo', { ascending: false }),
       ]);
 
@@ -301,11 +311,47 @@ export function usePeriodos() {
       r3_grado: values.r3_grado ?? periodoData.r3_grado ?? 'none',
     };
 
-    const { data, error: err } = await supabase
-      .from('periodos')
-      .upsert(payload, { onConflict: 'key_periodo' })
-      .select()
-      .single();
+    let data;
+    let err;
+
+    if (periodoData.id && !String(periodoData.id).startsWith('virtual-')) {
+      const res = await supabase
+        .from('periodos')
+        .update(payload)
+        .eq('id', periodoData.id)
+        .eq('user_id', user.id)
+        .select()
+        .single();
+      data = res.data;
+      err = res.error;
+    } else {
+      const { data: existente } = await supabase
+        .from('periodos')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('key_periodo', key_periodo)
+        .maybeSingle();
+
+      if (existente?.id) {
+        const res = await supabase
+          .from('periodos')
+          .update(payload)
+          .eq('id', existente.id)
+          .eq('user_id', user.id)
+          .select()
+          .single();
+        data = res.data;
+        err = res.error;
+      } else {
+        const res = await supabase
+          .from('periodos')
+          .insert(payload)
+          .select()
+          .single();
+        data = res.data;
+        err = res.error;
+      }
+    }
 
     if (err) throw new Error(err.message);
     await fetchPeriodos();

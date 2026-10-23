@@ -9,9 +9,16 @@ export function useClases(filtros = {}) {
   const fetchClases = useCallback(async () => {
     setLoading(true);
     setError(null);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      setClases([]);
+      setLoading(false);
+      return;
+    }
     let query = supabase
       .from('clases')
       .select(`*, grupos(nombre_grupo, horario, tarifa_id, tarifas(*))`)
+      .eq('user_id', user.id)
       .order('fecha_clase', { ascending: false });
 
     if (filtros.grupo_id) query = query.eq('grupo_id', filtros.grupo_id);
