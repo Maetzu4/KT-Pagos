@@ -1,23 +1,67 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../lib/supabaseClient';
+import { supabase, getCurrentUser } from '../lib/supabaseClient';
+
+// Caché en memoria indexado por filtros de consulta para acelerar re-visitas
+const clasesCache = new Map();
+
+// Selección optimizada: columnas estrictamente existentes en la tabla clases
+const SELECT_CLASES_OPTIMIZADO = `
+  id,
+  fecha_clase,
+  nombre_clase,
+  tema_clase,
+  estado_clase,
+  es_adicional,
+  fue_aplazada,
+  precio_cobrado,
+  en_reclamo,
+  periodo_id,
+  grupo_id,
+  user_id,
+  grupos (
+    id,
+    nombre_grupo,
+    horario,
+    tarifa_id,
+    tarifas (
+      id,
+      precio_regular,
+      precio_extra,
+      duracion_minutos
+    )
+  )
+`;
 
 export function useClases(filtros = {}) {
-  const [clases, setClases] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const cacheKey = `${filtros.grupo_id || ''}_${filtros.fecha_inicio || ''}_${filtros.fecha_fin || ''}_${filtros.periodo_id || ''}`;
+
+  const [clases, setClases] = useState(() => {
+    const cached = clasesCache.get(cacheKey);
+    return cached && cached.length > 0 ? cached : [];
+  });
+  const [loading, setLoading] = useState(() => !clasesCache.has(cacheKey));
   const [error, setError] = useState(null);
 
-  const fetchClases = useCallback(async () => {
-    setLoading(true);
+  const fetchClases = useCallback(async (force = false) => {
+    const cached = clasesCache.get(cacheKey);
+    if (!force && cached && cached.length > 0) {
+      setClases(cached);
+      setLoading(false);
+    } else if (!cached || cached.length === 0) {
+      setLoading(true);
+    }
     setError(null);
-    const { data: { user } } = await supabase.auth.getUser();
+
+    const user = await getCurrentUser();
     if (!user) {
       setClases([]);
       setLoading(false);
       return;
     }
+
     let query = supabase
       .from('clases')
-      .select(`*, grupos(nombre_grupo, horario, tarifa_id, tarifas(*))`)
+      .select(SELECT_CLASES_OPTIMIZADO)
       .eq('user_id', user.id)
       .order('fecha_clase', { ascending: false });
 
@@ -29,12 +73,22 @@ export function useClases(filtros = {}) {
     }
 
     const { data, error: err } = await query;
-    if (err) { setError(err.message); setLoading(false); return; }
-    setClases(data || []);
-    setLoading(false);
-  }, [filtros.grupo_id, filtros.fecha_inicio, filtros.fecha_fin, filtros.periodo_id]);
+    if (err) {
+      console.error('Error fetching clases:', err);
+      setError(err.message);
+      setLoading(false);
+      return;
+    }
 
-  useEffect(() => { fetchClases(); }, [fetchClases]);
+    const result = data || [];
+    clasesCache.set(cacheKey, result);
+    setClases(result);
+    setLoading(false);
+  }, [cacheKey, filtros.grupo_id, filtros.fecha_inicio, filtros.fecha_fin, filtros.periodo_id]);
+
+  useEffect(() => {
+    fetchClases();
+  }, [fetchClases]);
 
   /**
    * Crea una clase aplicando el Motor de Precios (Snapshot):
@@ -63,7 +117,7 @@ export function useClases(filtros = {}) {
 
     const { data: grupo, error: gErr } = await supabase
       .from('grupos')
-      .select(`tarifa_id, tarifas(precio_regular, precio_extra)`)
+      .select('tarifa_id, tarifas(precio_regular, precio_extra)')
       .eq('id', resolvedGrupoId)
       .single();
     if (gErr) throw new Error(gErr.message);
@@ -74,7 +128,7 @@ export function useClases(filtros = {}) {
     // Motor de precios: snapshot inmutable
     const precio_cobrado = isAdicional ? tarifa.precio_extra : tarifa.precio_regular;
 
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
 
     const insertPayload = {
       grupo_id: resolvedGrupoId,
@@ -94,17 +148,17 @@ export function useClases(filtros = {}) {
     const { data, error: err } = await supabase
       .from('clases')
       .insert([insertPayload])
-      .select(`*, grupos(nombre_grupo, tarifas(*))`)
+      .select(SELECT_CLASES_OPTIMIZADO)
       .single();
     if (err) throw new Error(err.message);
+
+    clasesCache.clear(); // Limpiar caché tras mutación
     setClases((prev) => [data, ...prev]);
     return data;
   };
 
   const updateClase = async (id, values) => {
     // ── Snapshot Preservation ──
-    // Si el payload incluye recalc: true, recalculamos el precio.
-    // De lo contrario, respetamos el precio_cobrado existente y simplemente actualizamos.
     const { recalc, es_extra, ...cleanValues } = values;
 
     if (es_extra !== undefined && cleanValues.es_adicional === undefined) {
@@ -114,14 +168,13 @@ export function useClases(filtros = {}) {
     let finalValues = { ...cleanValues };
 
     if (recalc) {
-      // El usuario cambió grupo_id o es_adicional → recalcular precio snapshot
       const rawGrupoId = String(cleanValues.grupo_id || '').trim();
       const isPureDigits = /^\d+$/.test(rawGrupoId);
       const resolvedGrupoId = isPureDigits ? Number(rawGrupoId) : rawGrupoId;
 
       const { data: grupo, error: gErr } = await supabase
         .from('grupos')
-        .select(`tarifa_id, tarifas(precio_regular, precio_extra)`)
+        .select('tarifa_id, tarifas(precio_regular, precio_extra)')
         .eq('id', resolvedGrupoId)
         .single();
       if (gErr) throw new Error(gErr.message);
@@ -162,9 +215,11 @@ export function useClases(filtros = {}) {
       .from('clases')
       .update(sanitizedPayload)
       .eq('id', id)
-      .select(`*, grupos(nombre_grupo, tarifas(*))`)
+      .select(SELECT_CLASES_OPTIMIZADO)
       .single();
     if (err) throw new Error(err.message);
+
+    clasesCache.clear(); // Limpiar caché tras mutación
     setClases((prev) => prev.map((c) => (c.id === id ? data : c)));
     return data;
   };
@@ -172,6 +227,7 @@ export function useClases(filtros = {}) {
   const deleteClase = async (id) => {
     const { error: err } = await supabase.from('clases').delete().eq('id', id);
     if (err) throw new Error(err.message);
+    clasesCache.clear();
     setClases((prev) => prev.filter((c) => c.id !== id));
   };
 
@@ -182,5 +238,14 @@ export function useClases(filtros = {}) {
     return updateClase(id, { en_reclamo: !clase.en_reclamo });
   };
 
-  return { clases, loading, error, refetch: fetchClases, createClase, updateClase, deleteClase, toggleReclamo };
+  return {
+    clases,
+    loading,
+    error,
+    refetch: () => fetchClases(true),
+    createClase,
+    updateClase,
+    deleteClase,
+    toggleReclamo,
+  };
 }

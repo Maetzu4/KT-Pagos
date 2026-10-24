@@ -19,6 +19,7 @@ import { usePeriodos } from '../hooks/usePeriodos';
 import { useClases } from '../hooks/useClases';
 import { useCountUp } from '../hooks/useCountUp';
 import { formatCurrency } from '../lib/utils';
+import { format, startOfMonth, endOfMonth } from 'date-fns';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -124,22 +125,39 @@ export default function Dashboard() {
     loading: loadingPeriodos,
   } = usePeriodos();
 
-  // Clases del periodo actual — incluye estado_clase y precio/tarifa
+  // Rango del mes actual precalculado para lanzar la consulta de clases en paralelo
+  // con usePeriodos y useGrupos desde el primer milisegundo (elimina peticiones en cascada)
+  const defaultRangoMes = useMemo(() => {
+    const hoy = new Date();
+    return {
+      key: format(hoy, 'yyyy-MM'),
+      fecha_inicio: format(startOfMonth(hoy), 'yyyy-MM-dd'),
+      fecha_fin: format(endOfMonth(hoy), 'yyyy-MM-dd'),
+    };
+  }, []);
+
+  const filtroClasesMes = useMemo(() => ({
+    fecha_inicio: periodoActual?.fecha_inicio || defaultRangoMes.fecha_inicio,
+    fecha_fin: periodoActual?.fecha_fin || defaultRangoMes.fecha_fin,
+  }), [periodoActual?.fecha_inicio, periodoActual?.fecha_fin, defaultRangoMes]);
+
+  // Clases del periodo actual — incluye estado_clase y precio/tarifa de forma concurrente
   const {
     clases: clasesMes,
     loading: loadingClases,
     refetch: refetchClases,
     updateClase,
-  } = useClases(
-    periodoActual
-      ? { fecha_inicio: periodoActual.fecha_inicio, fecha_fin: periodoActual.fecha_fin }
-      : {}
-  );
+  } = useClases(filtroClasesMes);
+
+  const keyPeriodoActivo = periodoActual?.key_periodo || defaultRangoMes.key;
 
   const clasesFiltradas = useMemo(() => {
-    if (!periodoActual?.key_periodo || !clasesMes) return [];
-    return clasesMes.filter((c) => c.fecha_clase?.startsWith(periodoActual.key_periodo));
-  }, [clasesMes, periodoActual]);
+    if (!clasesMes || !keyPeriodoActivo) return [];
+    return clasesMes.filter((c) => {
+      const fecha = (c.fecha_clase ?? '').split('T')[0].split(' ')[0];
+      return fecha.startsWith(keyPeriodoActivo);
+    });
+  }, [clasesMes, keyPeriodoActivo]);
 
   const [detalle,             setDetalle]             = useState(null);
   const [selectedPeriodo,     setSelectedPeriodo]     = useState(null);

@@ -1,19 +1,34 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../lib/supabaseClient';
+import { supabase, getCurrentUser } from '../lib/supabaseClient';
 import { parseISO, addDays, formatISO } from '../lib/dateUtils';
 import { generarClasesParaGrupo } from '../lib/generadorClases';
+
+// Caché en memoria para evitar re-fetches innecesarios entre navegaciones
+let gruposCache = null;
+let gruposCacheTime = 0;
+const CACHE_TTL_MS = 60000; // 1 minuto de validez
 
 // El estado de cada grupo se lee directamente desde la columna `estado` de la BD (V2).
 
 export function useGrupos() {
-  const [grupos, setGrupos] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [grupos, setGrupos] = useState(() => gruposCache || []);
+  const [loading, setLoading] = useState(() => !gruposCache);
   const [error, setError] = useState(null);
 
-  const fetchGrupos = useCallback(async () => {
-    setLoading(true);
+  const fetchGrupos = useCallback(async (force = false) => {
+    // Si la caché está viva y no es una recarga forzada, no volvemos a consultar
+    if (!force && gruposCache && (Date.now() - gruposCacheTime < CACHE_TTL_MS)) {
+      setGrupos(gruposCache);
+      setLoading(false);
+      return;
+    }
+
+    if (!gruposCache) {
+      setLoading(true);
+    }
     setError(null);
-    const { data: { user } } = await supabase.auth.getUser();
+
+    const user = await getCurrentUser();
     if (!user) {
       setGrupos([]);
       setLoading(false);
@@ -30,8 +45,16 @@ export function useGrupos() {
       `)
       .eq('user_id', user.id)
       .order('nombre_grupo', { ascending: true });
-    if (err) { setError(err.message); setLoading(false); return; }
-    setGrupos(data || []);
+
+    if (err) {
+      setError(err.message);
+      setLoading(false);
+      return;
+    }
+
+    gruposCache = data || [];
+    gruposCacheTime = Date.now();
+    setGrupos(gruposCache);
     setLoading(false);
   }, []);
 
@@ -67,7 +90,12 @@ export function useGrupos() {
       }
     }
 
-    setGrupos((prev) => [...prev, data]);
+    setGrupos((prev) => {
+      const updated = [...prev, data];
+      gruposCache = updated;
+      gruposCacheTime = Date.now();
+      return updated;
+    });
     return data;
   };
 
@@ -183,7 +211,12 @@ export function useGrupos() {
       }
     }
 
-    setGrupos((prev) => prev.map((g) => (g.id === id ? data : g)));
+    setGrupos((prev) => {
+      const updated = prev.map((g) => (g.id === id ? data : g));
+      gruposCache = updated;
+      gruposCacheTime = Date.now();
+      return updated;
+    });
     return data;
   };
 
@@ -192,7 +225,12 @@ export function useGrupos() {
     await supabase.from('clases').delete().eq('grupo_id', id);
     const { error: err } = await supabase.from('grupos').delete().eq('id', id);
     if (err) throw new Error(err.message);
-    setGrupos((prev) => prev.filter((c) => c.id !== id));
+    setGrupos((prev) => {
+      const updated = prev.filter((c) => c.id !== id);
+      gruposCache = updated;
+      gruposCacheTime = Date.now();
+      return updated;
+    });
   };
 
   const gruposActivos = grupos.filter((g) => g.estado === 'activo');

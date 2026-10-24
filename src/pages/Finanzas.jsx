@@ -86,9 +86,9 @@ export default function Finanzas() {
   }, [periodoActual, aniosDisponibles, filtroAnio, anioDefault]);
 
   // Totales globales animados (Total Estimado, Total Pagado, Total Arrastrado)
-  const animEstimado = useCountUp(metricas?.totalEstimado ?? 0);
-  const animPagado = useCountUp(metricas?.totalCobrado ?? metricas?.totalPagado ?? 0);
-  const animRollover = useCountUp(metricas?.totalRollover ?? 0);
+  const animEstimado = useCountUp(loading ? 0 : (metricas?.totalEstimado ?? 0));
+  const animPagado = useCountUp(loading ? 0 : (metricas?.totalCobrado ?? metricas?.totalPagado ?? 0));
+  const animRollover = useCountUp(loading ? 0 : (metricas?.totalRollover ?? 0));
 
   // ── Filtrado por Año ───────────────────────────────────────────────────────
   const periodosFiltrados = useMemo(() => {

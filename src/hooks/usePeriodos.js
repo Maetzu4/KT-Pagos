@@ -1,6 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../lib/supabaseClient';
+import { supabase, getCurrentUser } from '../lib/supabaseClient';
 import { parseISO, startOfMonth, endOfMonth, formatISO, nombrePeriodo } from '../lib/dateUtils';
+
+// Caché en memoria para evitar recálculos masivos de periodos en navegaciones rápidas
+let periodosCache = null;
+let periodosCacheTime = 0;
+const CACHE_TTL_MS = 60000; // 1 minuto de validez
 
 /** Obtiene el precio efectivo de una clase V2 */
 export const getPrecioClase = (c) => {
@@ -9,23 +14,32 @@ export const getPrecioClase = (c) => {
 };
 
 export function usePeriodos() {
-  const [periodos, setPeriodos] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [periodos, setPeriodos] = useState(() => periodosCache || []);
+  const [loading, setLoading] = useState(() => !periodosCache);
   const [error, setError] = useState(null);
 
-  const fetchPeriodos = useCallback(async () => {
-    setLoading(true);
+  const fetchPeriodos = useCallback(async (force = false) => {
+    // Si la caché está fresca y no es recarga forzada, reutilizar
+    if (!force && periodosCache && (Date.now() - periodosCacheTime < CACHE_TTL_MS)) {
+      setPeriodos(periodosCache);
+      setLoading(false);
+      return;
+    }
+
+    if (!periodosCache) {
+      setLoading(true);
+    }
     setError(null);
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getCurrentUser();
       if (!user) {
         setPeriodos([]);
         setLoading(false);
         return;
       }
 
-      // 1. Fetch a clases donde estado_clase === 'Completada' trayendo grupos y tarifas
+      // 1. Fetch a clases completadas optimizado trayendo estrictamente los datos financieros necesarios
       const [
         { data: clasesData, error: clasesErr },
         { data: periodosData, error: periodosErr },
@@ -38,20 +52,10 @@ export function usePeriodos() {
             estado_clase,
             precio_cobrado,
             en_reclamo,
-            tema_clase,
-            nombre_clase,
             es_adicional,
-            grupo_id,
-            user_id,
             grupos (
-              id,
-              nombre_grupo,
-              tarifa_id,
               tarifas (
-                id,
-                duracion_minutos,
-                precio_regular,
-                precio_extra
+                precio_regular
               )
             )
           `)
@@ -263,8 +267,11 @@ export function usePeriodos() {
         };
       });
 
-      // Guardar en orden DESC (más reciente primero)
-      setPeriodos([...enriched].reverse());
+      // Guardar en orden DESC (más reciente primero) y sincronizar caché
+      const resultado = [...enriched].reverse();
+      periodosCache = resultado;
+      periodosCacheTime = Date.now();
+      setPeriodos(resultado);
     } catch (err) {
       console.error('Error cargando periodos en Finanzas:', err);
       setError(err.message);
@@ -354,7 +361,7 @@ export function usePeriodos() {
     }
 
     if (err) throw new Error(err.message);
-    await fetchPeriodos();
+    await fetchPeriodos(true);
     return data;
   };
 
@@ -400,7 +407,12 @@ export function usePeriodos() {
 
     const { error: err } = await supabase.from('periodos').delete().eq('id', id);
     if (err) throw new Error(err.message);
-    setPeriodos((prev) => prev.filter((p) => p.id !== id));
+    setPeriodos((prev) => {
+      const updated = prev.filter((p) => p.id !== id);
+      periodosCache = updated;
+      periodosCacheTime = Date.now();
+      return updated;
+    });
   };
 
   // Periodo del mes actual
@@ -435,7 +447,7 @@ export function usePeriodos() {
     periodos,
     loading,
     error,
-    refetch: fetchPeriodos,
+    refetch: () => fetchPeriodos(true),
     updatePeriodo,
     savePeriodoFinanciero,
     upsertPeriodo,

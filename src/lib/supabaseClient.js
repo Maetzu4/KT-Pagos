@@ -14,3 +14,20 @@ export const supabase = createClient(
   supabaseUrl || 'https://placeholder.supabase.co',
   supabaseAnonKey || 'placeholder-key'
 );
+
+/**
+ * Obtiene el usuario autenticado actual de forma ultra-rápida:
+ * Primero verifica la sesión local en almacenamiento (0ms, sin round-trip de red).
+ * Solo si la sesión no está disponible hace fallback a getUser().
+ */
+export async function getCurrentUser() {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user) return session.user;
+    const { data: { user } } = await supabase.auth.getUser();
+    return user || null;
+  } catch (err) {
+    console.error('Error al obtener usuario actual:', err);
+    return null;
+  }
+}
