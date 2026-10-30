@@ -154,6 +154,7 @@ export default function Dashboard() {
   const clasesFiltradas = useMemo(() => {
     if (!clasesMes || !keyPeriodoActivo) return [];
     return clasesMes.filter((c) => {
+      if (c.estado_clase === 'Transferida') return false;
       const fecha = (c.fecha_clase ?? '').split('T')[0].split(' ')[0];
       return fecha.startsWith(keyPeriodoActivo);
     });

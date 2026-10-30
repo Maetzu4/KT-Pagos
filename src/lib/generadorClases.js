@@ -12,16 +12,22 @@
 /**
  * Genera el array de payloads listos para insertar en `clases`.
  *
- * @param {object} grupo                    - Fila de la tabla grupos (V2)
- * @param {string} grupo.id                 - UUID del grupo
- * @param {string} [grupo.user_id]          - UUID del propietario
- * @param {string} grupo.fecha_inicio_grupo - 'YYYY-MM-DD', 'YYYY-MM-DD HH:mm:ss' o ISO
- * @param {number} grupo.lecciones_totales  - cantidad de lecciones
+ * @param {object} grupo                        - Fila de la tabla grupos (V2)
+ * @param {string} grupo.id                     - UUID del grupo
+ * @param {string} [grupo.user_id]              - UUID del propietario
+ * @param {string} grupo.fecha_inicio_grupo     - 'YYYY-MM-DD', 'YYYY-MM-DD HH:mm:ss' o ISO
+ * @param {number} grupo.lecciones_totales      - cantidad de lecciones
+ * @param {number} [grupo.leccion_inicio_cobro] - lección desde la cual se cobra (default: 1).
+ *                                                Las lecciones anteriores se generan como
+ *                                                'Transferida' con precio_cobrado = 0.
  *
  * @returns {object[]} Array síncrono de payloads listos para insertar
  */
 export function generarClasesParaGrupo(grupo) {
-  const { id: grupo_id, user_id, fecha_inicio_grupo, lecciones_totales } = grupo;
+  const { id: grupo_id, user_id, fecha_inicio_grupo, lecciones_totales, leccion_inicio_cobro } = grupo;
+  const inicioCobro = (leccion_inicio_cobro != null && leccion_inicio_cobro >= 1)
+    ? Number(leccion_inicio_cobro)
+    : 1;
 
   if (!fecha_inicio_grupo) {
     throw new Error(`El grupo "${grupo.nombre_grupo ?? grupo_id}" no tiene fecha_inicio_grupo.`);
@@ -47,15 +53,19 @@ export function generarClasesParaGrupo(grupo) {
     const m = String(currentDate.getMonth() + 1).padStart(2, '0');
     const d = String(currentDate.getDate()).padStart(2, '0');
 
+    // Si la lección es anterior a leccion_inicio_cobro, se marca como Transferida
+    // y el precio se fuerza a 0 (clase heredada, no cobrable).
+    const esHeredada = i < inicioCobro;
+
     clases.push({
       grupo_id,
       user_id: user_id ?? null,
       fecha_clase: `${y}-${m}-${d}`,
-      estado_clase: currentDate < hoy ? 'Completada' : 'Programada',
+      estado_clase: esHeredada ? 'Transferida' : (currentDate < hoy ? 'Completada' : 'Programada'),
       es_adicional: false,
       tema_clase: `Lección ${i}`,
       nombre_clase: `Lección ${i}`,
-      precio_cobrado: null,
+      precio_cobrado: esHeredada ? 0 : null,
       periodo_id: null,
     });
 

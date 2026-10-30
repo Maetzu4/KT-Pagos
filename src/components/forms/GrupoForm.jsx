@@ -4,14 +4,15 @@ import { FormField, Input } from '../ui/FormField';
 import { Button } from '../ui/Button';
 
 const DEFAULT = {
-  nombre_grupo:      '',
-  curso_nombre:      '',
-  curso_codigo:      '',
-  fecha_inicio_grupo: '',
-  horario:           '',
-  lecciones_totales: '',
-  duracion_minutos:  '',
-  link_bo:           '',
+  nombre_grupo:         '',
+  curso_nombre:         '',
+  curso_codigo:         '',
+  fecha_inicio_grupo:   '',
+  horario:              '',
+  lecciones_totales:    '',
+  duracion_minutos:     '',
+  link_bo:              '',
+  leccion_inicio_cobro: '1',
 };
 
 function getInitialState(initial) {
@@ -27,6 +28,7 @@ function getInitialState(initial) {
     lecciones_totales:  initial.lecciones_totales   != null ? String(initial.lecciones_totales) : '',
     duracion_minutos:   initial.duracion_minutos     != null ? String(initial.duracion_minutos)  : '',
     link_bo:            initial.link_bo             ?? '',
+    leccion_inicio_cobro: initial.leccion_inicio_cobro != null ? String(initial.leccion_inicio_cobro) : '1',
   };
 }
 
@@ -53,15 +55,16 @@ export function GrupoForm({ initial, onSubmit, onCancel }) {
     setSaving(true);
     setError('');
     const payload = {
-      nombre_grupo:       form.nombre_grupo.trim(),
-      curso_nombre:       form.curso_nombre.trim()   || null,
-      curso_codigo:       form.curso_codigo.trim()   || null,
-      fecha_inicio_grupo: form.fecha_inicio_grupo    || null,
-      horario:            form.horario.trim()        || null,
-      lecciones_totales:  form.lecciones_totales !== '' ? Number(form.lecciones_totales) : null,
-      duracion_minutos:   form.duracion_minutos  !== '' ? Number(form.duracion_minutos)  : null,
-      link_bo:            form.link_bo.trim()        || null,
-      user_id:            initial?.user_id ?? null,
+      nombre_grupo:         form.nombre_grupo.trim(),
+      curso_nombre:         form.curso_nombre.trim()   || null,
+      curso_codigo:         form.curso_codigo.trim()   || null,
+      fecha_inicio_grupo:   form.fecha_inicio_grupo    || null,
+      horario:              form.horario.trim()        || null,
+      lecciones_totales:    form.lecciones_totales !== '' ? Number(form.lecciones_totales) : null,
+      duracion_minutos:     form.duracion_minutos  !== '' ? Number(form.duracion_minutos)  : null,
+      link_bo:              form.link_bo.trim()        || null,
+      leccion_inicio_cobro: form.leccion_inicio_cobro !== '' ? Number(form.leccion_inicio_cobro) : 1,
+      user_id:              initial?.user_id ?? null,
     };
     try {
       await onSubmit(payload);
@@ -155,6 +158,20 @@ export function GrupoForm({ initial, onSubmit, onCancel }) {
             value={form.duracion_minutos}
             onChange={set('duracion_minutos')}
             placeholder="Ej. 60"
+          />
+        </FormField>
+
+        <FormField
+          label="Lección de inicio de cobro"
+          hint="Las lecciones anteriores a este número se marcan como 'Transferida' con \$0 cobrado. Útil para grupos heredados."
+        >
+          <Input
+            id="leccion_inicio_cobro"
+            type="number"
+            min="1"
+            value={form.leccion_inicio_cobro}
+            onChange={set('leccion_inicio_cobro')}
+            placeholder="1"
           />
         </FormField>
 

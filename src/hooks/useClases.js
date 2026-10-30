@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase, getCurrentUser } from '../lib/supabaseClient';
+import { addDays, format, parseISO } from 'date-fns';
 
 // Caché en memoria indexado por filtros de consulta para acelerar re-visitas
 const clasesCache = new Map();
@@ -31,6 +32,64 @@ const SELECT_CLASES_OPTIMIZADO = `
     )
   )
 `;
+
+/**
+ * Aplaza masivamente todas las clases de un grupo desde una fecha dada,
+ * empujando su fecha_clase exactamente 7 días hacia el futuro y marcándolas
+ * con fue_aplazada: true.
+ *
+ * Exportada como función standalone para poder usarla desde cualquier componente
+ * sin necesidad de instanciar el hook useClases completo.
+ *
+ * @param {string} grupo_id     - UUID del grupo
+ * @param {string} fecha_origen - 'YYYY-MM-DD' — se aplaza esta clase y TODAS las posteriores
+ * @returns {Promise<number>} Cantidad de clases modificadas
+ */
+export async function aplazarClasesMasivo(grupo_id, fecha_origen) {
+  if (!grupo_id || !fecha_origen) throw new Error('grupo_id y fecha_origen son requeridos.');
+
+  const user = await getCurrentUser();
+  if (!user) throw new Error('No hay sesión activa.');
+
+  // 1. Obtener todas las clases del grupo desde la fecha origen (inclusive)
+  const { data: clasesAfectadas, error: fetchErr } = await supabase
+    .from('clases')
+    .select('id, fecha_clase, fue_aplazada')
+    .eq('grupo_id', grupo_id)
+    .eq('user_id', user.id)
+    .gte('fecha_clase', fecha_origen)
+    .order('fecha_clase', { ascending: true });
+
+  if (fetchErr) throw new Error(fetchErr.message);
+  if (!clasesAfectadas || clasesAfectadas.length === 0) return 0;
+
+  // 2. Construir el payload de upsert: +7 días por cada fila manteniendo formato 'yyyy-MM-dd'
+  const upsertPayload = clasesAfectadas.map((c) => {
+    const fechaOriginal = String(c.fecha_clase).split('T')[0].split(' ')[0];
+    const nuevaFecha    = format(addDays(parseISO(fechaOriginal), 7), 'yyyy-MM-dd');
+    return {
+      id:           c.id,
+      fecha_clase:  nuevaFecha,
+      fue_aplazada: c.fue_aplazada, // Conserva su estado original
+      user_id:      user.id,
+      grupo_id:     grupo_id,
+    };
+  });
+
+  // 3. Upsert en bloque (la PK 'id' ya está presente → Supabase hace UPDATE)
+  const CHUNK = 100;
+  for (let i = 0; i < upsertPayload.length; i += CHUNK) {
+    const { error: upsErr } = await supabase
+      .from('clases')
+      .upsert(upsertPayload.slice(i, i + CHUNK), { onConflict: 'id' });
+    if (upsErr) throw new Error(upsErr.message);
+  }
+
+  // 4. Invalida la caché local para que el próximo fetch traiga datos frescos
+  clasesCache.clear();
+
+  return clasesAfectadas.length;
+}
 
 export function useClases(filtros = {}) {
   const cacheKey = `${filtros.grupo_id || ''}_${filtros.fecha_inicio || ''}_${filtros.fecha_fin || ''}_${filtros.periodo_id || ''}`;
@@ -247,5 +306,6 @@ export function useClases(filtros = {}) {
     updateClase,
     deleteClase,
     toggleReclamo,
+    aplazarClasesMasivo,
   };
 }

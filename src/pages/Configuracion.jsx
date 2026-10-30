@@ -172,7 +172,10 @@ export default function Configuracion() {
         fecha: new Date().toISOString(),
         user_id: user.id,
         tarifas: tarifasData || [],
-        grupos: gruposData || [],
+        grupos: (gruposData || []).map((g) => ({
+          ...g,
+          leccion_inicio_cobro: g.leccion_inicio_cobro != null ? Number(g.leccion_inicio_cobro) : 1,
+        })),
         periodos: (periodosData || []).map((p) => ({
           ...p,
           requisitos_bono:  p.requisitos_bono  ?? false,
@@ -303,7 +306,7 @@ export default function Configuracion() {
             ? mapaTarifaId.get(rest.tarifa_id)
             : (rest.tarifa_id || null);
 
-          const payload = {
+          const grupoPlano = {
             user_id: user.id,
             nombre_grupo: rest.nombre_grupo,
             estado: rest.estado || 'activo',
@@ -315,25 +318,26 @@ export default function Configuracion() {
             curso_nombre: rest.curso_nombre ?? null,
             duracion_minutos: rest.duracion_minutos != null ? Number(rest.duracion_minutos) : null,
             lecciones_totales: rest.lecciones_totales != null ? Number(rest.lecciones_totales) : null,
+            leccion_inicio_cobro: rest.leccion_inicio_cobro != null ? Number(rest.leccion_inicio_cobro) : 1,
             tarifa_id: targetTarifaId,
           };
 
-          delete payload.id;
+          delete grupoPlano.id;
 
           const { data: nuevoG, error: insErr } = await supabase
             .from('grupos')
-            .insert(payload)
+            .insert(grupoPlano)
             .select('id')
             .single();
 
           if (insErr) {
             if (insErr.code === '23505' || insErr.message?.includes('unique constraint') || insErr.message?.includes('duplicate key')) {
               // El grupo ya existe en la base de datos: lo tratamos como existente y mapeamos su id
-              console.warn(`Grupo "${payload.nombre_grupo}" ya existe en la BD (omitido de inserción).`);
+              console.warn(`Grupo "${grupoPlano.nombre_grupo}" ya existe en la BD (omitido de inserción).`);
               const { data: existente } = await supabase
                 .from('grupos')
                 .select('id')
-                .eq('id_externo', payload.id_externo)
+                .eq('id_externo', grupoPlano.id_externo)
                 .maybeSingle();
 
               const idFinal = existente?.id || idViejo;
@@ -342,13 +346,13 @@ export default function Configuracion() {
               }
               continue;
             }
-            throw new Error(`Error al insertar grupo "${payload.nombre_grupo}": ${insErr.message}`);
+            throw new Error(`Error al insertar grupo "${grupoPlano.nombre_grupo}": ${insErr.message}`);
           }
 
           if (idViejo && nuevoG?.id) {
             mapaGrupoId.set(idViejo, nuevoG.id);
-            if (payload.id_externo) misGruposPorIdExt.set(payload.id_externo, nuevoG.id);
-            if (payload.nombre_grupo) misGruposPorNombre.set(payload.nombre_grupo, nuevoG.id);
+            if (grupoPlano.id_externo) misGruposPorIdExt.set(grupoPlano.id_externo, nuevoG.id);
+            if (grupoPlano.nombre_grupo) misGruposPorNombre.set(grupoPlano.nombre_grupo, nuevoG.id);
           }
         }
       }

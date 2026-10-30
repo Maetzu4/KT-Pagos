@@ -193,7 +193,8 @@ export function usePeriodos() {
       };
 
       const listaBase = Array.from(periodosMap.values()).map((p) => {
-        const clases = p.clases || [];
+        // Excluir clases Transferidas: son heredadas de otro tutor y no generan ingreso.
+        const clases = (p.clases || []).filter((c) => c.estado_clase !== 'Transferida');
 
         // Separar ingresos regulares y extras (excluyendo Canceladas)
         const ingresos_regulares = clases

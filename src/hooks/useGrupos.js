@@ -41,7 +41,7 @@ export function useGrupos() {
         id_externo, fecha_inicio_grupo, horario,
         link_bo, curso_codigo, curso_nombre,
         duracion_minutos, lecciones_totales,
-        tarifa_id, user_id
+        tarifa_id, user_id, leccion_inicio_cobro
       `)
       .eq('user_id', user.id)
       .order('nombre_grupo', { ascending: true });
@@ -77,7 +77,7 @@ export function useGrupos() {
         id_externo, fecha_inicio_grupo, horario,
         link_bo, curso_codigo, curso_nombre,
         duracion_minutos, lecciones_totales,
-        tarifa_id, user_id
+        tarifa_id, user_id, leccion_inicio_cobro
       `)
       .single();
     if (err) throw new Error(err.message);
@@ -105,7 +105,7 @@ export function useGrupos() {
     // 1. Detección de Cambios: Fetch del grupo original
     const { data: grupoOriginal, error: fetchErr } = await supabase
       .from('grupos')
-      .select('id, fecha_inicio_grupo, lecciones_totales, user_id')
+      .select('id, fecha_inicio_grupo, lecciones_totales, user_id, leccion_inicio_cobro')
       .eq('id', id)
       .single();
     if (fetchErr) throw new Error(fetchErr.message);
@@ -124,8 +124,16 @@ export function useGrupos() {
       ? (cleanPayload.lecciones_totales != null ? Number(cleanPayload.lecciones_totales) : null)
       : leccionesOriginales;
 
-    const cambioFecha = cleanPayload.fecha_inicio_grupo !== undefined && fechaNuevaStr !== fechaOriginalStr;
+    const inicioCobro_original = grupoOriginal?.leccion_inicio_cobro != null
+      ? Number(grupoOriginal.leccion_inicio_cobro)
+      : 1;
+    const inicioCobro_nuevo = cleanPayload.leccion_inicio_cobro !== undefined
+      ? Number(cleanPayload.leccion_inicio_cobro) || 1
+      : inicioCobro_original;
+
+    const cambioFecha    = cleanPayload.fecha_inicio_grupo !== undefined && fechaNuevaStr !== fechaOriginalStr;
     const cambioLecciones = cleanPayload.lecciones_totales !== undefined && leccionesNuevas !== leccionesOriginales;
+    const cambioInicioCobro = inicioCobro_nuevo !== inicioCobro_original;
     const huboCambios = cambioFecha || cambioLecciones;
 
     // Actualizar el grupo en Supabase
@@ -138,12 +146,71 @@ export function useGrupos() {
         id_externo, fecha_inicio_grupo, horario,
         link_bo, curso_codigo, curso_nombre,
         duracion_minutos, lecciones_totales,
-        tarifa_id, user_id
+        tarifa_id, user_id, leccion_inicio_cobro
       `)
       .single();
     if (err) throw new Error(err.message);
 
-    // 2. Recálculo inteligente (solo si la fecha de inicio o las lecciones totales cambiaron)
+    // ── 2a. Actualización retroactiva cuando leccion_inicio_cobro cambió ──────
+    // Obtenemos TODAS las clases del grupo ordenadas cronológicamente para
+    // asignar su índice posicional (1-based) y decidir si son heredadas.
+    if (cambioInicioCobro) {
+      const { data: todasClases, error: tErr } = await supabase
+        .from('clases')
+        .select('id, estado_clase, precio_cobrado')
+        .eq('grupo_id', id)
+        .eq('es_adicional', false)
+        .order('fecha_clase', { ascending: true });
+      if (tErr) throw new Error(tErr.message);
+
+      const clasesOrdenadas = todasClases || [];
+
+      // Dividir en dos grupos según el nuevo umbral
+      const aTransferir = clasesOrdenadas
+        .slice(0, inicioCobro_nuevo - 1)
+        .filter((c) => c.estado_clase !== 'Transferida' || c.precio_cobrado !== 0)
+        .map((c) => c.id);
+
+      const aRestaurar = clasesOrdenadas
+        .slice(inicioCobro_nuevo - 1)
+        .filter((c) => c.estado_clase === 'Transferida')
+        .map((c) => c.id);
+
+      // Marcar heredadas: Transferida + $0
+      if (aTransferir.length > 0) {
+        const { error: tfrErr } = await supabase
+          .from('clases')
+          .update({ estado_clase: 'Transferida', precio_cobrado: 0 })
+          .in('id', aTransferir);
+        if (tfrErr) throw new Error(tfrErr.message);
+      }
+
+      // Restaurar clases que ya no son heredadas: Programada/Completada según fecha
+      if (aRestaurar.length > 0) {
+        const hoyRest = new Date();
+        hoyRest.setHours(0, 0, 0, 0);
+
+        // Obtener las filas completas para saber la fecha y restaurar el estado correcto
+        const { data: filasARestaurar, error: frErr } = await supabase
+          .from('clases')
+          .select('id, fecha_clase')
+          .in('id', aRestaurar);
+        if (frErr) throw new Error(frErr.message);
+
+        // Actualizar una a una solo si el volumen es manejable; en grupos típicos < 30 lecciones
+        for (const fila of filasARestaurar || []) {
+          const fechaObj = new Date(`${String(fila.fecha_clase).split('T')[0]}T12:00:00`);
+          const estadoRestaurado = fechaObj < hoyRest ? 'Completada' : 'Programada';
+          const { error: rErr } = await supabase
+            .from('clases')
+            .update({ estado_clase: estadoRestaurado, precio_cobrado: null })
+            .eq('id', fila.id);
+          if (rErr) throw new Error(rErr.message);
+        }
+      }
+    }
+
+    // 2b. Recálculo inteligente (solo si la fecha de inicio o las lecciones totales cambiaron)
     if (huboCambios && fechaNuevaStr && leccionesNuevas != null) {
       // Eliminar todas las clases programadas existentes de este grupo
       const { error: delErr } = await supabase
@@ -180,12 +247,17 @@ export function useGrupos() {
         const hoy = new Date();
         hoy.setHours(0, 0, 0, 0);
 
+        const inicioCobro = (data?.leccion_inicio_cobro != null && data.leccion_inicio_cobro >= 1)
+          ? Number(data.leccion_inicio_cobro)
+          : 1;
+
         const nuevasClases = [];
         for (let i = 0; i < clasesFaltantes; i++) {
           const numLeccion = cantidadCompletadas + i + 1;
           const fechaClaseStr = formatISO(fechaCursor);
           const fechaObj = parseISO(fechaClaseStr);
-          const estadoCalculado = fechaObj < hoy ? 'Completada' : 'Programada';
+          const esHeredada = numLeccion < inicioCobro;
+          const estadoCalculado = esHeredada ? 'Transferida' : (fechaObj < hoy ? 'Completada' : 'Programada');
 
           nuevasClases.push({
             grupo_id: id,
@@ -195,7 +267,7 @@ export function useGrupos() {
             es_adicional: false,
             tema_clase: `Lección ${numLeccion}`,
             nombre_clase: `Lección ${numLeccion}`,
-            precio_cobrado: null,
+            precio_cobrado: esHeredada ? 0 : null,
             periodo_id: null,
           });
 

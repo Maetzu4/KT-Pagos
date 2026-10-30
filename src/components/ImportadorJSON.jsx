@@ -94,18 +94,22 @@ function mapGrupo(g, userId) {
     ? `${shortName} #${numId}`
     : shortName ?? rawIdExterno ?? 'Sin nombre';
 
+  const inicioCobroRaw = g.leccion_inicio_cobro ?? g.leccionInicioCobro ?? 1;
+  const inicioCobroNum = parseInt(inicioCobroRaw, 10);
+
   return {
-    nombre_grupo:       nombreGrupo,
-    user_id:            userId,
-    estado:             str(g.estado?.toLowerCase()) ?? 'activo',
-    id_externo:         rawIdExterno,
-    fecha_inicio_grupo: g.fechaInicio ?? g.fecha_inicio_grupo ?? null,
-    horario:            str(g.horarioTexto ?? g.horario) ?? null,
-    link_bo:            str(g.linkBO ?? g.link_bo)    ?? null,
-    curso_codigo:       str(g.curso?.codigo)  ?? null,
-    curso_nombre:       str(g.curso?.nombre)  ?? null,
-    duracion_minutos:   g.curso?.duracionMinutos  ?? null,
-    lecciones_totales:  g.curso?.leccionesTotales ?? null,
+    nombre_grupo:         nombreGrupo,
+    user_id:              userId,
+    estado:               str(g.estado?.toLowerCase()) ?? 'activo',
+    id_externo:           rawIdExterno,
+    fecha_inicio_grupo:   g.fechaInicio ?? g.fecha_inicio_grupo ?? null,
+    horario:              str(g.horarioTexto ?? g.horario) ?? null,
+    link_bo:              str(g.linkBO ?? g.link_bo)    ?? null,
+    curso_codigo:         str(g.curso?.codigo)  ?? null,
+    curso_nombre:         str(g.curso?.nombre)  ?? null,
+    duracion_minutos:     g.curso?.duracionMinutos  ?? null,
+    lecciones_totales:    g.curso?.leccionesTotales ?? null,
+    leccion_inicio_cobro: isNaN(inicioCobroNum) || inicioCobroNum < 1 ? 1 : inicioCobroNum,
   };
 }
 
@@ -143,6 +147,18 @@ export function ImportadorJSON() {
     });
   };
 
+  /** Permite al usuario editar la lección de inicio de cobro de un grupo antes de guardar. */
+  const handleUpdateInicioCobro = (index, value) => {
+    setGrupos((prev) => {
+      const next = [...prev];
+      next[index] = {
+        ...next[index],
+        leccion_inicio_cobro: value === '' ? '' : Math.max(1, parseInt(value, 10) || 1),
+      };
+      return next;
+    });
+  };
+
   // ── 1. Leer portapapeles y validar ──────────────────────────────────────
   const handlePegar = async () => {
     setMensaje('');
@@ -170,7 +186,12 @@ export function ImportadorJSON() {
         return;
       }
 
-      setGrupos(rawGrupos);
+      const rawGruposConDefaults = rawGrupos.map((g) => ({
+        ...g,
+        leccion_inicio_cobro: g.leccion_inicio_cobro ?? g.leccionInicioCobro ?? 1,
+      }));
+
+      setGrupos(rawGruposConDefaults);
       setStep(STEP.PREVIEW);
     } catch (err) {
       // El usuario denegó el permiso del portapapeles
@@ -267,6 +288,9 @@ export function ImportadorJSON() {
         const tarifaMatch = tarifas.find(t => t.duracion_minutos === g.curso?.duracionMinutos)
           ?? tarifaFallback;
 
+        const inicioCobroNum = parseInt(g.leccion_inicio_cobro, 10);
+        const resolvedInicioCobro = !isNaN(inicioCobroNum) && inicioCobroNum >= 1 ? inicioCobroNum : 1;
+
         const payload = {
           user_id: user.id,
           nombre_grupo: raw.nombre_grupo,
@@ -279,6 +303,7 @@ export function ImportadorJSON() {
           curso_nombre: raw.curso_nombre ?? null,
           duracion_minutos: raw.duracion_minutos != null ? Number(raw.duracion_minutos) : null,
           lecciones_totales: raw.lecciones_totales != null ? Number(raw.lecciones_totales) : null,
+          leccion_inicio_cobro: resolvedInicioCobro,
           tarifa_id: tarifaMatch?.id ?? null,
         };
 
@@ -288,7 +313,7 @@ export function ImportadorJSON() {
           const { data: fila, error: saveErr } = await supabase
             .from('grupos')
             .insert(payload)
-            .select('id, nombre_grupo, user_id, fecha_inicio_grupo, lecciones_totales, horario, duracion_minutos, tarifa_id')
+            .select('id, nombre_grupo, user_id, fecha_inicio_grupo, lecciones_totales, horario, duracion_minutos, tarifa_id, leccion_inicio_cobro')
             .single();
 
           if (saveErr) {
@@ -499,7 +524,7 @@ export function ImportadorJSON() {
               <table className="min-w-full text-sm">
                 <thead className="sticky top-0 z-10 bg-zinc-50 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800">
                   <tr>
-                    {['Grupo', 'Horario', 'Estado', 'Lecciones', 'ID Externo', 'Link BO'].map((h) => (
+                    {['Grupo', 'Horario', 'Estado', 'Lecciones', 'Inicio Cobro', 'ID Externo', 'Link BO'].map((h) => (
                       <th
                         key={h}
                         className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider whitespace-nowrap"
@@ -552,6 +577,25 @@ export function ImportadorJSON() {
                                        focus:ring-2 focus:ring-[var(--accent-color)]/40
                                        transition-all"
                             placeholder="—"
+                          />
+                        </td>
+
+                        {/* Inicio Cobro — editable */}
+                        <td className="px-4 py-2">
+                          <input
+                            type="number"
+                            min="1"
+                            value={g.leccion_inicio_cobro ?? 1}
+                            onChange={(e) => handleUpdateInicioCobro(i, e.target.value)}
+                            className="w-16 text-center text-sm rounded-lg
+                                       bg-zinc-100 dark:bg-zinc-800
+                                       border border-zinc-300 dark:border-zinc-700
+                                       text-zinc-900 dark:text-white
+                                       px-2 py-1 focus:outline-none
+                                       focus:ring-2 focus:ring-[var(--accent-color)]/40
+                                       transition-all"
+                            placeholder="1"
+                            title="Lección de inicio de cobro (por defecto 1)"
                           />
                         </td>
 

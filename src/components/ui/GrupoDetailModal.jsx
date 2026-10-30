@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Plus, Calendar, Clock, ExternalLink, X, ChevronDown, CheckCircle2 } from 'lucide-react';
+import { Plus, Calendar, Clock, ExternalLink, X, ChevronDown, CheckCircle2, CalendarChevronsRight } from 'lucide-react';
 import { Modal } from './Modal';
 import { Badge } from './Badge';
 import { Button } from './Button';
 import { ClaseExtraModal } from '../modals/ClaseExtraModal';
 import { ReprogramarClaseModal } from '../modals/ReprogramarClaseModal';
 import { supabase } from '../../lib/supabaseClient';
+import { aplazarClasesMasivo } from '../../hooks/useClases';
 import { cn } from '../../lib/utils';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -18,13 +19,14 @@ function fmtFecha(str) {
   return `${d}/${m}/${y}`;
 }
 
-const ESTADOS_CLASE = ['Programada', 'Completada', 'Aplazada', 'Cancelada'];
+const ESTADOS_CLASE = ['Programada', 'Completada', 'Aplazada', 'Cancelada', 'Transferida'];
 
 const ESTADO_STYLES = {
-  Completada: 'bg-[var(--accent-color)] text-white border-transparent',
-  Aplazada:   'border border-[var(--accent-color)] text-[var(--accent-color)] bg-transparent',
-  Programada: 'bg-[var(--accent-color)]/10 text-[var(--accent-color)] border-transparent',
-  Cancelada:  'text-zinc-500 bg-zinc-100 dark:bg-zinc-800/50 border-transparent',
+  Completada:  'bg-[var(--accent-color)] text-white border-transparent',
+  Aplazada:    'border border-[var(--accent-color)] text-[var(--accent-color)] bg-transparent',
+  Programada:  'bg-[var(--accent-color)]/10 text-[var(--accent-color)] border-transparent',
+  Cancelada:   'text-zinc-500 bg-zinc-100 dark:bg-zinc-800/50 border-transparent',
+  Transferida: 'text-violet-500 bg-violet-100 dark:bg-violet-900/30 border-transparent',
 };
 
 // ─── Selector de estado inline ────────────────────────────────────────────────
@@ -91,6 +93,8 @@ export function GrupoDetailModal({ grupo, open, onClose, onEdit, onClassUpdate }
   const [isExtraModalOpen,   setIsExtraModalOpen]   = useState(false);
   const [claseAReprogramar,  setClaseAReprogramar]  = useState(null);
   const [filtroEstado,       setFiltroEstado]       = useState('todas');
+  const [isAplazando,        setIsAplazando]        = useState(false);
+  const [toastMsg,           setToastMsg]           = useState(null); // { type: 'ok'|'err', text }
 
   // Fetch clases del grupo
   const fetchClases = useCallback(async () => {
@@ -137,6 +141,27 @@ export function GrupoDetailModal({ grupo, open, onClose, onEdit, onClassUpdate }
     await updateClase(c.id, { fecha_clase: nuevaFecha, estado_clase: 'Programada', fue_aplazada: true });
   };
 
+  // ── Aplazo masivo: esta clase y todas las posteriores +7 días ──────────────
+  const handleAplazarMasivo = async (clase) => {
+    const ok = window.confirm("¿Seguro que deseas aplazar esta clase y TODAS las programadas posteriormente exactamente 7 días?");
+    if (!ok) return;
+
+    setIsAplazando(true);
+    setToastMsg(null);
+    try {
+      const cantidad = await aplazarClasesMasivo(grupo.id, clase.fecha_clase);
+      await fetchClases();
+      onClassUpdate?.();
+      setToastMsg({ type: 'ok', text: `✓ ${cantidad} clase${cantidad !== 1 ? 's' : ''} aplazada${cantidad !== 1 ? 's' : ''} +7 días correctamente.` });
+    } catch (err) {
+      console.error('Error en aplazo masivo:', err);
+      setToastMsg({ type: 'err', text: `Error: ${err.message}` });
+    } finally {
+      setIsAplazando(false);
+      setTimeout(() => setToastMsg(null), 5000);
+    }
+  };
+
   const stats = useMemo(() => {
     const total = clases.length;
     const completadas = clases.filter((c) => (c.estado_clase || '').toLowerCase() === 'completada').length;
@@ -163,6 +188,27 @@ export function GrupoDetailModal({ grupo, open, onClose, onEdit, onClassUpdate }
     <>
       <Modal open={open} onClose={onClose} title={grupo.nombre_grupo} size="xl">
         <div className="space-y-4">
+
+          {/* ── Toast de notificación / Feedback ── */}
+          {toastMsg && (
+            <div
+              className={cn(
+                'px-4 py-2.5 rounded-xl text-xs font-medium flex items-center justify-between transition-all animate-fade-in',
+                toastMsg.type === 'ok'
+                  ? 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
+                  : 'bg-rose-50 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
+              )}
+            >
+              <span>{toastMsg.text}</span>
+              <button
+                type="button"
+                onClick={() => setToastMsg(null)}
+                className="text-current opacity-70 hover:opacity-100 p-0.5 rounded cursor-pointer"
+              >
+                <X size={13} />
+              </button>
+            </div>
+          )}
 
           {/* ── Resumen del grupo (Horario, Inicio, Progreso) ── */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full">
@@ -294,6 +340,9 @@ export function GrupoDetailModal({ grupo, open, onClose, onEdit, onClassUpdate }
                       <th className="px-4 py-3 text-center text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider whitespace-nowrap w-24">
                         Aplazada
                       </th>
+                      <th className="px-4 py-3 text-center text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider whitespace-nowrap w-16">
+                        Acción
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800 bg-white dark:bg-zinc-900">
@@ -338,6 +387,18 @@ export function GrupoDetailModal({ grupo, open, onClose, onEdit, onClassUpdate }
                               title={c.fue_aplazada ? 'Marcada como aplazada' : 'Marcar como aplazada'}
                             />
                           </label>
+                        </td>
+                        {/* Botón Aplazo Masivo */}
+                        <td className="px-4 py-3 text-center whitespace-nowrap">
+                          <button
+                            type="button"
+                            disabled={isAplazando}
+                            onClick={() => handleAplazarMasivo(c)}
+                            title="Aplazar 1 semana (esta y posteriores)"
+                            className="inline-flex items-center justify-center p-1.5 rounded-lg text-zinc-500 hover:text-[var(--accent-color)] hover:bg-[var(--accent-color)]/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                          >
+                            <CalendarChevronsRight size={16} />
+                          </button>
                         </td>
                       </tr>
                     ))}
