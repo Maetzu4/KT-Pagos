@@ -31,3 +31,21 @@ export async function getCurrentUser() {
     return null;
   }
 }
+
+/**
+ * Determina si la aplicación debe operar en modo local (IndexedDB)
+ * o en modo remoto (Supabase).
+ * Retorna true si NO hay sesión activa o si no hay usuario autenticado.
+ */
+export async function isAppOffline() {
+  const user = await getCurrentUser();
+  return !user;
+}
+
+/**
+ * Retorna true si hay un usuario con sesión activa en Supabase.
+ */
+export async function hasActiveSession() {
+  const user = await getCurrentUser();
+  return Boolean(user);
+}

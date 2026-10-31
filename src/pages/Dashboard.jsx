@@ -350,26 +350,18 @@ export default function Dashboard() {
   ];
 
   return (
-    <div className="space-y-8 animate-fade-in">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold text-zinc-900 dark:text-white">Dashboard</h1>
-          <p className="text-sm text-zinc-500 mt-1">
-            {periodoActual?.nombre_periodo
-              ? `Resumen de ${periodoActual.nombre_periodo}`
-              : 'Resumen financiero de tutorías'}
-          </p>
-        </div>
-        <Button
-          onClick={() => setIsExtraModalOpen(true)}
-          id="btn-add-clase-extra-dashboard"
-          className="shadow-sm"
-        >
-          <Plus size={16} /> Añadir Extra
-        </Button>
+    <div className="animate-fade-in">
+      <div className="hidden md:block mb-8">
+        <h1 className="text-2xl font-semibold text-zinc-900 dark:text-white">Dashboard</h1>
+        <p className="text-sm text-zinc-500 mt-1">
+          {periodoActual?.nombre_periodo
+            ? `Resumen de ${periodoActual.nombre_periodo}`
+            : 'Resumen financiero de tutorías'}
+        </p>
       </div>
 
-      {/* ── Hero Banner: Proyectado del Mes (Bloque sólido) ── */}
+      <div className="space-y-6 md:space-y-8">
+        {/* ── Hero Banner: Proyectado del Mes (Bloque sólido) ── */}
       <div className="rounded-2xl bg-[var(--accent-color)] p-6 sm:p-8 text-white shadow-lg shadow-[var(--accent-color)]/20">
         <div className="flex items-center gap-2 mb-2">
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-white/20 text-white backdrop-blur-sm">
@@ -465,6 +457,14 @@ export default function Dashboard() {
               </span>
             )}
           </div>
+          {/* Botón Añadir Extra — visible en móvil y desktop */}
+          <Button
+            onClick={() => setIsExtraModalOpen(true)}
+            id="btn-add-clase-extra-dashboard"
+            className="h-8 text-xs px-3 shadow-sm"
+          >
+            <Plus size={14} /> Añadir Extra
+          </Button>
         </div>
 
         {pendientes.length === 0 ? (
@@ -658,6 +658,7 @@ export default function Dashboard() {
           await handleClassUpdate();
         }}
       />
+      </div>
     </div>
   );
 }

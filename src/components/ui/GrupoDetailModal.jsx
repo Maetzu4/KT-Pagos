@@ -6,6 +6,8 @@ import { Button } from './Button';
 import { ClaseExtraModal } from '../modals/ClaseExtraModal';
 import { ReprogramarClaseModal } from '../modals/ReprogramarClaseModal';
 import { supabase } from '../../lib/supabaseClient';
+import { useAuth } from '../../hooks/useAuth';
+import { localDb } from '../../lib/localDb';
 import { aplazarClasesMasivo } from '../../hooks/useClases';
 import { cn } from '../../lib/utils';
 
@@ -24,9 +26,9 @@ const ESTADOS_CLASE = ['Programada', 'Completada', 'Aplazada', 'Cancelada', 'Tra
 const ESTADO_STYLES = {
   Completada:  'bg-[var(--accent-color)] text-white border-transparent',
   Aplazada:    'border border-[var(--accent-color)] text-[var(--accent-color)] bg-transparent',
-  Programada:  'bg-[var(--accent-color)]/10 text-[var(--accent-color)] border-transparent',
+  Programada:  'text-zinc-700 dark:text-zinc-300 bg-transparent border-zinc-300 dark:border-zinc-700',
   Cancelada:   'text-zinc-500 bg-zinc-100 dark:bg-zinc-800/50 border-transparent',
-  Transferida: 'text-violet-500 bg-violet-100 dark:bg-violet-900/30 border-transparent',
+  Transferida: 'text-[var(--accent-color)] bg-[var(--accent-color)]/20 border-transparent opacity-80 italic',
 };
 
 // ─── Selector de estado inline ────────────────────────────────────────────────
@@ -50,15 +52,17 @@ function EstadoSelector({ clase, claseId, estadoActual, onUpdate, onAplazar }) {
   return (
     <div className="relative inline-block">
       <button
+        type="button"
         onClick={() => setOpen((p) => !p)}
         disabled={saving}
-        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold border
-                    transition-all duration-150 cursor-pointer hover:opacity-80
-                    ${ESTADO_STYLES[estadoActual] ?? 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20'}
-                    ${saving ? 'opacity-50 cursor-wait' : ''}`}
+        className={cn(
+          'inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold border transition-all duration-150 cursor-pointer hover:opacity-80',
+          ESTADO_STYLES[estadoActual] ?? 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20',
+          saving && 'opacity-50 cursor-wait'
+        )}
       >
         {estadoActual}
-        <ChevronDown size={10} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+        <ChevronDown size={10} className={cn('transition-transform', open && 'rotate-180')} />
       </button>
 
       {open && (
@@ -88,6 +92,7 @@ function EstadoSelector({ clase, claseId, estadoActual, onUpdate, onAplazar }) {
 
 // ─── Modal principal ──────────────────────────────────────────────────────────
 export function GrupoDetailModal({ grupo, open, onClose, onEdit, onClassUpdate }) {
+  const { isOffline } = useAuth();
   const [clases,             setClases]             = useState([]);
   const [loading,            setLoading]            = useState(false);
   const [isExtraModalOpen,   setIsExtraModalOpen]   = useState(false);
@@ -100,6 +105,23 @@ export function GrupoDetailModal({ grupo, open, onClose, onEdit, onClassUpdate }
   const fetchClases = useCallback(async () => {
     if (!grupo?.id) return;
     setLoading(true);
+
+    if (isOffline) {
+      try {
+        const data = await localDb.clases
+          .filter((c) => String(c.grupo_id) === String(grupo.id))
+          .toArray();
+        data.sort((a, b) => (a.fecha_clase ?? '').localeCompare(b.fecha_clase ?? ''));
+        setClases(data ?? []);
+      } catch (err) {
+        console.error('Error cargando clases del grupo en modo local:', err);
+        setClases([]);
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
     const { data } = await supabase
       .from('clases')
       .select('id, tema_clase, fecha_clase, estado_clase, es_adicional, fue_aplazada')
@@ -107,7 +129,7 @@ export function GrupoDetailModal({ grupo, open, onClose, onEdit, onClassUpdate }
       .order('fecha_clase', { ascending: true });
     setClases(data ?? []);
     setLoading(false);
-  }, [grupo?.id]);
+  }, [grupo?.id, isOffline]);
 
   useEffect(() => {
     if (open) fetchClases();
@@ -118,8 +140,23 @@ export function GrupoDetailModal({ grupo, open, onClose, onEdit, onClassUpdate }
     }
   }, [open, fetchClases]);
 
-  // Actualizar clase en Supabase
+  // Actualizar clase (híbrido)
   const updateClase = async (claseId, updates) => {
+    if (isOffline) {
+      try {
+        const claseExistente = await localDb.clases.get(claseId);
+        const updated = { ...(claseExistente || {}), ...updates, id: claseId };
+        await localDb.clases.put(updated);
+        setClases((prev) =>
+          prev.map((c) => (c.id === claseId ? { ...c, ...updated } : c))
+        );
+        onClassUpdate?.();
+      } catch (err) {
+        console.error('Error actualizando clase localmente:', err);
+      }
+      return;
+    }
+
     const { data, error } = await supabase
       .from('clases')
       .update(updates)
@@ -195,7 +232,7 @@ export function GrupoDetailModal({ grupo, open, onClose, onEdit, onClassUpdate }
               className={cn(
                 'px-4 py-2.5 rounded-xl text-xs font-medium flex items-center justify-between transition-all animate-fade-in',
                 toastMsg.type === 'ok'
-                  ? 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
+                  ? 'bg-[var(--accent-color)]/10 text-[var(--accent-color)] border border-[var(--accent-color)]/20'
                   : 'bg-rose-50 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
               )}
             >

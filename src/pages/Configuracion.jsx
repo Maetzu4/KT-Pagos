@@ -1,7 +1,9 @@
-import { useState, useRef, useEffect } from 'react';
-import { Plus, Pencil, Trash2, Sun, Moon, LogOut, Heart, Database, Download, Upload, User } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { Plus, Pencil, Trash2, Sun, Moon, LogOut, Heart, Database, Download, Upload, User, HardDrive } from 'lucide-react';
 import { ImportadorJSON } from '../components/ImportadorJSON';
 import { supabase } from '../lib/supabaseClient';
+import { useAuth } from '../hooks/useAuth';
+import { localDb, generateLocalId } from '../lib/localDb';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Toggle } from '../components/ui/Toggle';
@@ -91,6 +93,7 @@ function TarifaForm({ initial, onSubmit, onCancel }) {
 
 export default function Configuracion() {
   const { mode, toggleMode } = useTheme();
+  const { isOffline, user } = useAuth();
   const { tarifas, loading, createTarifa, updateTarifa, deleteTarifa } = useTarifas();
 
   const [modal, setModal] = useState(null); // null | 'create' | tarifa
@@ -99,7 +102,7 @@ export default function Configuracion() {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [isDonationModalOpen, setIsDonationModalOpen] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
-  const [currentUser, setCurrentUser] = useState(null);
+  const currentUser = user;
 
   // Estados de Respaldo y Zona de Peligro
   const [exporting, setExporting] = useState(false);
@@ -108,12 +111,6 @@ export default function Configuracion() {
   const [confirmDeleteText, setConfirmDeleteText] = useState('');
   const [deletingAll, setDeletingAll] = useState(false);
   const fileInputRef = useRef(null);
-
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) setCurrentUser(user);
-    });
-  }, []);
 
   const handleSubmit = async (values) => {
     if (modal === 'create') await createTarifa(values);
@@ -153,24 +150,38 @@ export default function Configuracion() {
     return allRows;
   };
 
-  // ── Sistema de Backup ────────────────────────────────────────────────────────
+  // ── Sistema de Backup Híbrido ───────────────────────────────────────────────
   const handleDownloadBackup = async () => {
     setExporting(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('No hay sesión de usuario activa.');
+      const currentUserId = user?.id || 'local-user';
 
-      const [tarifasData, gruposData, periodosData, clasesData] = await Promise.all([
-        fetchAllUserRows('tarifas', user.id),
-        fetchAllUserRows('grupos', user.id),
-        fetchAllUserRows('periodos', user.id),
-        fetchAllUserRows('clases', user.id),
-      ]);
+      if (!isOffline && !user) {
+        throw new Error('No hay sesión de usuario activa.');
+      }
+
+      let tarifasData, gruposData, periodosData, clasesData;
+
+      if (isOffline) {
+        [tarifasData, gruposData, periodosData, clasesData] = await Promise.all([
+          localDb.tarifas.toArray(),
+          localDb.grupos.toArray(),
+          localDb.periodos.toArray(),
+          localDb.clases.toArray(),
+        ]);
+      } else {
+        [tarifasData, gruposData, periodosData, clasesData] = await Promise.all([
+          fetchAllUserRows('tarifas', currentUserId),
+          fetchAllUserRows('grupos', currentUserId),
+          fetchAllUserRows('periodos', currentUserId),
+          fetchAllUserRows('clases', currentUserId),
+        ]);
+      }
 
       const backupObj = {
         version: 3,
         fecha: new Date().toISOString(),
-        user_id: user.id,
+        user_id: currentUserId,
         tarifas: tarifasData || [],
         grupos: (gruposData || []).map((g) => ({
           ...g,
@@ -195,7 +206,7 @@ export default function Configuracion() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'kt-pagos-backup.json';
+      a.download = `kt-pagos-backup${isOffline ? '-local' : ''}.json`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -217,97 +228,109 @@ export default function Configuracion() {
       const text = await file.text();
       const parsedData = JSON.parse(text);
 
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError || !user) throw new Error('No hay sesión de usuario activa.');
+      const currentUserId = user?.id || 'local-user';
+      if (!isOffline && !user) {
+        throw new Error('No hay sesión de usuario activa.');
+      }
 
-      // Consultar IDs existentes para verificar permisos y evitar violaciones de unicidad o RLS
-      const { data: misTarifasExistentes, error: errFetchT } = await supabase
-        .from('tarifas')
-        .select('id, duracion_minutos')
-        .eq('user_id', user.id);
-      if (errFetchT) throw new Error(`Error al verificar tarifas: ${errFetchT.message}`);
+      let misTarifasIds = new Set();
+      let misTarifasPorDuracion = new Map();
+      let misGruposPorIdExt = new Map();
+      let misGruposPorNombre = new Map();
+      let misGruposIds = new Set();
+      let misPeriodosPorKey = new Map();
+      let misPeriodosIds = new Set();
 
-      const misTarifasIds = new Set((misTarifasExistentes || []).map((mt) => mt.id));
-      const misTarifasPorDuracion = new Map(
-        (misTarifasExistentes || []).map((mt) => [mt.duracion_minutos, mt.id])
-      );
+      if (!isOffline) {
+        // Consultar IDs existentes en Supabase para verificar permisos y evitar violaciones de unicidad o RLS
+        const { data: misTarifasExistentes, error: errFetchT } = await supabase
+          .from('tarifas')
+          .select('id, duracion_minutos')
+          .eq('user_id', currentUserId);
+        if (errFetchT) throw new Error(`Error al verificar tarifas: ${errFetchT.message}`);
+
+        misTarifasIds = new Set((misTarifasExistentes || []).map((mt) => mt.id));
+        misTarifasPorDuracion = new Map(
+          (misTarifasExistentes || []).map((mt) => [mt.duracion_minutos, mt.id])
+        );
+
+        const { data: misGruposExistentes, error: errFetchG } = await supabase
+          .from('grupos')
+          .select('id, id_externo, nombre_grupo')
+          .eq('user_id', currentUserId);
+        if (errFetchG) throw new Error(`Error al verificar grupos: ${errFetchG.message}`);
+
+        misGruposPorIdExt = new Map(
+          (misGruposExistentes || []).filter(mg => mg.id_externo).map(mg => [mg.id_externo, mg.id])
+        );
+        misGruposPorNombre = new Map(
+          (misGruposExistentes || []).filter(mg => mg.nombre_grupo).map(mg => [mg.nombre_grupo, mg.id])
+        );
+        misGruposIds = new Set((misGruposExistentes || []).map(mg => mg.id));
+
+        const { data: misPeriodosExistentes, error: errFetchP } = await supabase
+          .from('periodos')
+          .select('id, key_periodo')
+          .eq('user_id', currentUserId);
+        if (errFetchP) throw new Error(`Error al verificar periodos: ${errFetchP.message}`);
+
+        misPeriodosPorKey = new Map((misPeriodosExistentes || []).map(p => [p.key_periodo, p.id]));
+        misPeriodosIds = new Set((misPeriodosExistentes || []).map(p => p.id));
+      }
 
       const mapaTarifaId  = new Map();
       const mapaGrupoId   = new Map();
       const mapaPeriodoId = new Map();
 
-      // Inserción estricta en orden para evitar errores de llaves foráneas:
-      // 1º Tarifas: Solo añadir tarifas de duraciones que no existan
+      // ── 1º Tarifas ──
       if (Array.isArray(parsedData.tarifas) && parsedData.tarifas.length > 0) {
         for (const t of parsedData.tarifas) {
           const tarifaPlana = {
-            user_id: user.id,
+            id: t.id || generateLocalId(),
+            user_id: currentUserId,
             duracion_minutos: Number(t.duracion_minutos || 0),
             precio_regular: Number(t.precio_regular || 0),
             precio_extra: Number(t.precio_extra || 0),
           };
 
-          const existingId = (t.id && misTarifasIds.has(t.id) ? t.id : null)
-            || misTarifasPorDuracion.get(tarifaPlana.duracion_minutos);
-
-          if (existingId) {
-            // Ya existe: no se modifica ni se añade
-            if (t.id) mapaTarifaId.set(t.id, existingId);
+          if (isOffline) {
+            await localDb.tarifas.put(tarifaPlana);
+            if (t.id) mapaTarifaId.set(t.id, tarifaPlana.id);
           } else {
-            // Nueva tarifa: insertar sin id para que la BD genere uno nuevo
-            const { data: nuevaTarifa, error: insErr } = await supabase
-              .from('tarifas')
-              .insert(tarifaPlana)
-              .select('id')
-              .single();
-            if (insErr) throw new Error(`Error al insertar tarifa: ${insErr.message}`);
-            if (t.id && nuevaTarifa?.id) {
-              mapaTarifaId.set(t.id, nuevaTarifa.id);
-              misTarifasPorDuracion.set(tarifaPlana.duracion_minutos, nuevaTarifa.id);
+            const existingId = (t.id && misTarifasIds.has(t.id) ? t.id : null)
+              || misTarifasPorDuracion.get(tarifaPlana.duracion_minutos);
+
+            if (existingId) {
+              if (t.id) mapaTarifaId.set(t.id, existingId);
+            } else {
+              delete tarifaPlana.id;
+              const { data: nuevaTarifa, error: insErr } = await supabase
+                .from('tarifas')
+                .insert(tarifaPlana)
+                .select('id')
+                .single();
+              if (insErr) throw new Error(`Error al insertar tarifa: ${insErr.message}`);
+              if (t.id && nuevaTarifa?.id) {
+                mapaTarifaId.set(t.id, nuevaTarifa.id);
+                misTarifasPorDuracion.set(tarifaPlana.duracion_minutos, nuevaTarifa.id);
+              }
             }
           }
         }
       }
 
-      // 2º Grupos: Consultar grupos existentes y solo añadir los nuevos
-      const { data: misGruposExistentes, error: errFetchG } = await supabase
-        .from('grupos')
-        .select('id, id_externo, nombre_grupo')
-        .eq('user_id', user.id);
-      if (errFetchG) throw new Error(`Error al verificar grupos: ${errFetchG.message}`);
-
-      const misGruposPorIdExt = new Map(
-        (misGruposExistentes || []).filter(mg => mg.id_externo).map(mg => [mg.id_externo, mg.id])
-      );
-      const misGruposPorNombre = new Map(
-        (misGruposExistentes || []).filter(mg => mg.nombre_grupo).map(mg => [mg.nombre_grupo, mg.id])
-      );
-      const misGruposIds = new Set((misGruposExistentes || []).map(mg => mg.id));
-
+      // ── 2º Grupos ──
       if (Array.isArray(parsedData.grupos) && parsedData.grupos.length > 0) {
         for (const g of parsedData.grupos) {
           const { id: idViejo, tarifas: _t, clases: _c, user: _u, ...rest } = g;
 
-          // Verificar si ya existe por id_externo, por nombre_grupo, o por id propio
-          const idExistente = (rest.id_externo && misGruposPorIdExt.get(rest.id_externo))
-            || (rest.nombre_grupo && misGruposPorNombre.get(rest.nombre_grupo))
-            || (idViejo && misGruposIds.has(idViejo) ? idViejo : null);
-
-          if (idExistente) {
-            // Ya existe: no se modifica ni se añade. Se mapea para que las clases se vinculen
-            if (idViejo) {
-              mapaGrupoId.set(idViejo, idExistente);
-            }
-            continue;
-          }
-
-          // Es un grupo NUEVO: se inserta
           const targetTarifaId = (rest.tarifa_id && mapaTarifaId.has(rest.tarifa_id))
             ? mapaTarifaId.get(rest.tarifa_id)
             : (rest.tarifa_id || null);
 
           const grupoPlano = {
-            user_id: user.id,
+            id: idViejo || generateLocalId(),
+            user_id: currentUserId,
             nombre_grupo: rest.nombre_grupo,
             estado: rest.estado || 'activo',
             id_externo: rest.id_externo ?? null,
@@ -322,69 +345,62 @@ export default function Configuracion() {
             tarifa_id: targetTarifaId,
           };
 
-          delete grupoPlano.id;
+          if (isOffline) {
+            await localDb.grupos.put(grupoPlano);
+            if (idViejo) mapaGrupoId.set(idViejo, grupoPlano.id);
+          } else {
+            const idExistente = (rest.id_externo && misGruposPorIdExt.get(rest.id_externo))
+              || (rest.nombre_grupo && misGruposPorNombre.get(rest.nombre_grupo))
+              || (idViejo && misGruposIds.has(idViejo) ? idViejo : null);
 
-          const { data: nuevoG, error: insErr } = await supabase
-            .from('grupos')
-            .insert(grupoPlano)
-            .select('id')
-            .single();
-
-          if (insErr) {
-            if (insErr.code === '23505' || insErr.message?.includes('unique constraint') || insErr.message?.includes('duplicate key')) {
-              // El grupo ya existe en la base de datos: lo tratamos como existente y mapeamos su id
-              console.warn(`Grupo "${grupoPlano.nombre_grupo}" ya existe en la BD (omitido de inserción).`);
-              const { data: existente } = await supabase
-                .from('grupos')
-                .select('id')
-                .eq('id_externo', grupoPlano.id_externo)
-                .maybeSingle();
-
-              const idFinal = existente?.id || idViejo;
-              if (idViejo && idFinal) {
-                mapaGrupoId.set(idViejo, idFinal);
-              }
+            if (idExistente) {
+              if (idViejo) mapaGrupoId.set(idViejo, idExistente);
               continue;
             }
-            throw new Error(`Error al insertar grupo "${grupoPlano.nombre_grupo}": ${insErr.message}`);
-          }
 
-          if (idViejo && nuevoG?.id) {
-            mapaGrupoId.set(idViejo, nuevoG.id);
-            if (grupoPlano.id_externo) misGruposPorIdExt.set(grupoPlano.id_externo, nuevoG.id);
-            if (grupoPlano.nombre_grupo) misGruposPorNombre.set(grupoPlano.nombre_grupo, nuevoG.id);
+            delete grupoPlano.id;
+
+            const { data: nuevoG, error: insErr } = await supabase
+              .from('grupos')
+              .insert(grupoPlano)
+              .select('id')
+              .single();
+
+            if (insErr) {
+              if (insErr.code === '23505' || insErr.message?.includes('unique constraint') || insErr.message?.includes('duplicate key')) {
+                console.warn(`Grupo "${grupoPlano.nombre_grupo}" ya existe en la BD (omitido de inserción).`);
+                const { data: existente } = await supabase
+                  .from('grupos')
+                  .select('id')
+                  .eq('id_externo', grupoPlano.id_externo)
+                  .maybeSingle();
+
+                const idFinal = existente?.id || idViejo;
+                if (idViejo && idFinal) mapaGrupoId.set(idViejo, idFinal);
+                continue;
+              }
+              throw new Error(`Error al insertar grupo "${grupoPlano.nombre_grupo}": ${insErr.message}`);
+            }
+
+            if (idViejo && nuevoG?.id) {
+              mapaGrupoId.set(idViejo, nuevoG.id);
+              if (grupoPlano.id_externo) misGruposPorIdExt.set(grupoPlano.id_externo, nuevoG.id);
+              if (grupoPlano.nombre_grupo) misGruposPorNombre.set(grupoPlano.nombre_grupo, nuevoG.id);
+            }
           }
         }
       }
 
-      // 3º Periodos: Consultar periodos existentes por key_periodo e id
-      const { data: misPeriodosExistentes, error: errFetchP } = await supabase
-        .from('periodos')
-        .select('id, key_periodo')
-        .eq('user_id', user.id);
-      if (errFetchP) throw new Error(`Error al verificar periodos: ${errFetchP.message}`);
-
-      const misPeriodosPorKey = new Map((misPeriodosExistentes || []).map(p => [p.key_periodo, p.id]));
-      const misPeriodosIds = new Set((misPeriodosExistentes || []).map(p => p.id));
-
+      // ── 3º Periodos ──
       if (Array.isArray(parsedData.periodos) && parsedData.periodos.length > 0) {
         for (const p of parsedData.periodos) {
           const { clases: _c, user: _u, ...rest } = p;
           const idViejoP = rest.id;
-
           const keyPeriodo = rest.key_periodo || `${rest.anio}-${rest.mes}`;
-          const idExistenteP = (keyPeriodo && misPeriodosPorKey.get(keyPeriodo))
-            || (idViejoP && misPeriodosIds.has(idViejoP) ? idViejoP : null);
 
-          if (idExistenteP) {
-            // Ya existe: no se añade ni se modifica
-            if (idViejoP) mapaPeriodoId.set(idViejoP, idExistenteP);
-            continue;
-          }
-
-          // Nuevo periodo: insertar con las columnas reales del esquema
           const payloadP = {
-            user_id: user.id,
+            id: idViejoP || generateLocalId(),
+            user_id: currentUserId,
             mes: String(rest.mes || ''),
             anio: String(rest.anio || ''),
             key_periodo: keyPeriodo,
@@ -397,153 +413,177 @@ export default function Configuracion() {
             r3_grado: ['none', 'good', 'amazing'].includes(rest.r3_grado) ? rest.r3_grado : 'none',
           };
 
-          delete payloadP.id;
+          if (isOffline) {
+            await localDb.periodos.put(payloadP);
+            if (idViejoP) mapaPeriodoId.set(idViejoP, payloadP.id);
+          } else {
+            const idExistenteP = (keyPeriodo && misPeriodosPorKey.get(keyPeriodo))
+              || (idViejoP && misPeriodosIds.has(idViejoP) ? idViejoP : null);
 
-          const { data: nuevoP, error: insPErr } = await supabase
-            .from('periodos')
-            .insert(payloadP)
-            .select('id')
-            .single();
-
-          if (insPErr) {
-            if (insPErr.code === '23505' || insPErr.message?.includes('unique constraint') || insPErr.message?.includes('duplicate key')) {
-              console.warn(`Periodo "${payloadP.key_periodo}" ya existe en la BD.`);
-              const { data: existenteP } = await supabase
-                .from('periodos')
-                .select('id')
-                .eq('key_periodo', payloadP.key_periodo)
-                .maybeSingle();
-
-              const idP = existenteP?.id || idViejoP;
-              if (idViejoP && idP) {
-                mapaPeriodoId.set(idViejoP, idP);
-              }
+            if (idExistenteP) {
+              if (idViejoP) mapaPeriodoId.set(idViejoP, idExistenteP);
               continue;
             }
-            throw new Error(`Error al insertar periodo "${payloadP.key_periodo}": ${insPErr.message}`);
-          }
 
-          if (idViejoP && nuevoP?.id) {
-            mapaPeriodoId.set(idViejoP, nuevoP.id);
-            if (payloadP.key_periodo) misPeriodosPorKey.set(payloadP.key_periodo, nuevoP.id);
+            delete payloadP.id;
+
+            const { data: nuevoP, error: insPErr } = await supabase
+              .from('periodos')
+              .insert(payloadP)
+              .select('id')
+              .single();
+
+            if (insPErr) {
+              if (insPErr.code === '23505' || insPErr.message?.includes('unique constraint') || insPErr.message?.includes('duplicate key')) {
+                console.warn(`Periodo "${payloadP.key_periodo}" ya existe en la BD.`);
+                const { data: existenteP } = await supabase
+                  .from('periodos')
+                  .select('id')
+                  .eq('key_periodo', payloadP.key_periodo)
+                  .maybeSingle();
+
+                const idP = existenteP?.id || idViejoP;
+                if (idViejoP && idP) mapaPeriodoId.set(idViejoP, idP);
+                continue;
+              }
+              throw new Error(`Error al insertar periodo "${payloadP.key_periodo}": ${insPErr.message}`);
+            }
+
+            if (idViejoP && nuevoP?.id) {
+              mapaPeriodoId.set(idViejoP, nuevoP.id);
+              if (payloadP.key_periodo) misPeriodosPorKey.set(payloadP.key_periodo, nuevoP.id);
+            }
           }
         }
       }
 
-      // 4º Clases: Consultar clases existentes y solo insertar las nuevas
+      // ── 4º Clases ──
       if (Array.isArray(parsedData.clases) && parsedData.clases.length > 0) {
-        const misClasesExistentes = await fetchAllUserRows(
-          'clases',
-          user.id,
-          'id, grupo_id, fecha_clase, nombre_clase, es_adicional'
-        );
+        if (isOffline) {
+          for (const c of parsedData.clases) {
+            const { grupos: _g, periodos: _p, user: _u, ...rest } = c;
+            const targetGrupoId = (rest.grupo_id && mapaGrupoId.has(rest.grupo_id))
+              ? mapaGrupoId.get(rest.grupo_id)
+              : rest.grupo_id;
+            const targetPeriodoId = (rest.periodo_id && mapaPeriodoId.has(rest.periodo_id))
+              ? mapaPeriodoId.get(rest.periodo_id)
+              : rest.periodo_id;
 
-        // 1. UUIDs existentes en la base de datos para detección directa
-        const misClasesIds = new Set((misClasesExistentes || []).map(c => c.id));
+            const claseLocal = {
+              id: rest.id || generateLocalId(),
+              user_id: currentUserId,
+              grupo_id: targetGrupoId,
+              periodo_id: targetPeriodoId ?? null,
+              fecha_clase: rest.fecha_clase,
+              estado_clase: rest.estado_clase || 'Programada',
+              es_adicional: Boolean(rest.es_adicional ?? rest.es_extra),
+              fue_aplazada: typeof rest.fue_aplazada === 'boolean' ? rest.fue_aplazada : false,
+              en_reclamo: Boolean(rest.en_reclamo),
+              tema_clase: rest.tema_clase ?? null,
+              nombre_clase: rest.nombre_clase ?? null,
+              precio_cobrado: rest.precio_cobrado != null ? Number(rest.precio_cobrado) : null,
+            };
 
-        // 2. Clases regulares existentes en la BD (evita duplicar lecciones del currículo)
-        const misClasesRegulares = new Set(
-          (misClasesExistentes || [])
-            .filter(c => !c.es_adicional)
-            .map(c => `${c.grupo_id}|${c.fecha_clase}|${c.nombre_clase || ''}`)
-        );
+            await localDb.clases.put(claseLocal);
+          }
+        } else {
+          const misClasesExistentes = await fetchAllUserRows(
+            'clases',
+            currentUserId,
+            'id, grupo_id, fecha_clase, nombre_clase, es_adicional'
+          );
 
-        // 3. Conteo de clases extras existentes en BD agrupadas por grupo y fecha
-        const extrasDisponiblesEnDB = new Map();
-        for (const c of (misClasesExistentes || []).filter(c => c.es_adicional)) {
-          const key = `${c.grupo_id}|${c.fecha_clase}`;
-          extrasDisponiblesEnDB.set(key, (extrasDisponiblesEnDB.get(key) || 0) + 1);
-        }
+          const misClasesIds = new Set((misClasesExistentes || []).map(c => c.id));
+          const misClasesRegulares = new Set(
+            (misClasesExistentes || [])
+              .filter(c => !c.es_adicional)
+              .map(c => `${c.grupo_id}|${c.fecha_clase}|${c.nombre_clase || ''}`)
+          );
 
-        // Para evitar duplicar dentro del mismo archivo de backup (mismo UUID)
-        const idsVistosEnBackup = new Set();
-        const clasesToInsert = [];
-
-        for (const c of parsedData.clases) {
-          const { grupos: _g, periodos: _p, user: _u, ...rest } = c;
-
-          // Si este ID ya fue procesado en este mismo backup, ignorar repetición
-          if (rest.id && idsVistosEnBackup.has(rest.id)) continue;
-          if (rest.id) idsVistosEnBackup.add(rest.id);
-
-          const targetGrupoId = (rest.grupo_id && mapaGrupoId.has(rest.grupo_id))
-            ? mapaGrupoId.get(rest.grupo_id)
-            : rest.grupo_id;
-
-          const targetPeriodoId = (rest.periodo_id && mapaPeriodoId.has(rest.periodo_id))
-            ? mapaPeriodoId.get(rest.periodo_id)
-            : rest.periodo_id;
-
-          const isExtra = Boolean(rest.es_adicional ?? rest.es_extra);
-
-          // Si ya existe por UUID exacto en la BD → omitir
-          if (rest.id && misClasesIds.has(rest.id)) {
-            // Descontar del conteo de extras en BD si aplica
-            if (isExtra) {
-              const kExtra = `${targetGrupoId}|${rest.fecha_clase}`;
-              const count = extrasDisponiblesEnDB.get(kExtra) || 0;
-              if (count > 0) extrasDisponiblesEnDB.set(kExtra, count - 1);
-            }
-            continue;
+          const extrasDisponiblesEnDB = new Map();
+          for (const c of (misClasesExistentes || []).filter(c => c.es_adicional)) {
+            const key = `${c.grupo_id}|${c.fecha_clase}`;
+            extrasDisponiblesEnDB.set(key, (extrasDisponiblesEnDB.get(key) || 0) + 1);
           }
 
-          if (isExtra) {
-            // Es clase EXTRA:
-            // Si la BD ya contiene una clase extra en esta fecha y grupo que no tenía este UUID, la descontamos
-            const kExtra = `${targetGrupoId}|${rest.fecha_clase}`;
-            const countDisponibles = extrasDisponiblesEnDB.get(kExtra) || 0;
-            if (countDisponibles > 0) {
-              extrasDisponiblesEnDB.set(kExtra, countDisponibles - 1);
-              continue; // Ya está cubierta en la BD
-            }
-            // Si no hay más extras disponibles en la BD para esa fecha/grupo, se debe insertar.
-            // Esto permite que si hay 2 o más clases extras el mismo día en el mismo curso, se añadan todas.
-          } else {
-            // Es clase REGULAR (del currículo):
-            // Omitir si ya existe la misma lección para ese grupo y fecha
-            const claveRegular = `${targetGrupoId}|${rest.fecha_clase}|${rest.nombre_clase || ''}`;
-            if (misClasesRegulares.has(claveRegular)) {
-              continue;
-            }
-            misClasesRegulares.add(claveRegular);
-          }
+          const idsVistosEnBackup = new Set();
+          const clasesToInsert = [];
 
-          const clasePayload = {
-            user_id: user.id,
-            grupo_id: targetGrupoId,
-            periodo_id: targetPeriodoId ?? null,
-            fecha_clase: rest.fecha_clase,
-            estado_clase: rest.estado_clase || 'Programada',
-            es_adicional: isExtra,
-            fue_aplazada: typeof rest.fue_aplazada === 'boolean' ? rest.fue_aplazada : false,
-            tema_clase: rest.tema_clase ?? null,
-            nombre_clase: rest.nombre_clase ?? null,
-            precio_cobrado: rest.precio_cobrado != null ? Number(rest.precio_cobrado) : null,
-          };
+          for (const c of parsedData.clases) {
+            const { grupos: _g, periodos: _p, user: _u, ...rest } = c;
 
-          // Preservar el UUID original del backup si está presente y no existe en BD
-          if (rest.id && !misClasesIds.has(rest.id)) {
-            clasePayload.id = rest.id;
-          }
+            if (rest.id && idsVistosEnBackup.has(rest.id)) continue;
+            if (rest.id) idsVistosEnBackup.add(rest.id);
 
-          clasesToInsert.push(clasePayload);
-        }
+            const targetGrupoId = (rest.grupo_id && mapaGrupoId.has(rest.grupo_id))
+              ? mapaGrupoId.get(rest.grupo_id)
+              : rest.grupo_id;
 
-        const CHUNK = 100;
-        for (let i = 0; i < clasesToInsert.length; i += CHUNK) {
-          const chunk = clasesToInsert.slice(i, i + CHUNK);
-          const { error: cErr } = await supabase.from('clases').insert(chunk);
-          if (cErr) {
-            // Si hubo colisión de clave única (ej. UUID en otra cuenta), reintentar sin forzar IDs
-            if (cErr.code === '23505' || cErr.message?.includes('unique constraint') || cErr.message?.includes('duplicate key')) {
-              const fallbackChunk = chunk.map(({ id: _dropId, ...cRest }) => cRest);
-              const { error: fbErr } = await supabase.from('clases').insert(fallbackChunk);
-              if (fbErr) {
-                console.warn('Lote de clases omitido:', fbErr.message);
+            const targetPeriodoId = (rest.periodo_id && mapaPeriodoId.has(rest.periodo_id))
+              ? mapaPeriodoId.get(rest.periodo_id)
+              : rest.periodo_id;
+
+            const isExtra = Boolean(rest.es_adicional ?? rest.es_extra);
+
+            if (rest.id && misClasesIds.has(rest.id)) {
+              if (isExtra) {
+                const kExtra = `${targetGrupoId}|${rest.fecha_clase}`;
+                const count = extrasDisponiblesEnDB.get(kExtra) || 0;
+                if (count > 0) extrasDisponiblesEnDB.set(kExtra, count - 1);
               }
               continue;
             }
-            throw new Error(`Error al insertar clases (lote ${Math.floor(i / CHUNK) + 1}): ${cErr.message}`);
+
+            if (isExtra) {
+              const kExtra = `${targetGrupoId}|${rest.fecha_clase}`;
+              const countDisponibles = extrasDisponiblesEnDB.get(kExtra) || 0;
+              if (countDisponibles > 0) {
+                extrasDisponiblesEnDB.set(kExtra, countDisponibles - 1);
+                continue;
+              }
+            } else {
+              const claveRegular = `${targetGrupoId}|${rest.fecha_clase}|${rest.nombre_clase || ''}`;
+              if (misClasesRegulares.has(claveRegular)) {
+                continue;
+              }
+              misClasesRegulares.add(claveRegular);
+            }
+
+            const clasePayload = {
+              user_id: currentUserId,
+              grupo_id: targetGrupoId,
+              periodo_id: targetPeriodoId ?? null,
+              fecha_clase: rest.fecha_clase,
+              estado_clase: rest.estado_clase || 'Programada',
+              es_adicional: isExtra,
+              fue_aplazada: typeof rest.fue_aplazada === 'boolean' ? rest.fue_aplazada : false,
+              tema_clase: rest.tema_clase ?? null,
+              nombre_clase: rest.nombre_clase ?? null,
+              precio_cobrado: rest.precio_cobrado != null ? Number(rest.precio_cobrado) : null,
+            };
+
+            if (rest.id && !misClasesIds.has(rest.id)) {
+              clasePayload.id = rest.id;
+            }
+
+            clasesToInsert.push(clasePayload);
+          }
+
+          const CHUNK = 100;
+          for (let i = 0; i < clasesToInsert.length; i += CHUNK) {
+            const chunk = clasesToInsert.slice(i, i + CHUNK);
+            const { error: cErr } = await supabase.from('clases').insert(chunk);
+            if (cErr) {
+              if (cErr.code === '23505' || cErr.message?.includes('unique constraint') || cErr.message?.includes('duplicate key')) {
+                const fallbackChunk = chunk.map(({ id: _dropId, ...cRest }) => cRest);
+                const { error: fbErr } = await supabase.from('clases').insert(fallbackChunk);
+                if (fbErr) {
+                  console.warn('Lote de clases omitido:', fbErr.message);
+                }
+                continue;
+              }
+              throw new Error(`Error al insertar clases (lote ${Math.floor(i / CHUNK) + 1}): ${cErr.message}`);
+            }
           }
         }
       }
@@ -559,37 +599,52 @@ export default function Configuracion() {
     }
   };
 
-  // ── Zona de Peligro (Borrado Total) ───────────────────────────────────────────
+  // ── Zona de Peligro (Borrado Total Híbrido) ───────────────────────────────────
   const handleDeleteAllData = async () => {
     if (confirmDeleteText !== 'CONFIRMO') return;
     setDeletingAll(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const currentUserId = user?.id || 'local-user';
+
+      if (isOffline) {
+        await Promise.all([
+          localDb.clases.clear(),
+          localDb.grupos.clear(),
+          localDb.periodos.clear(),
+          localDb.tarifas.clear(),
+        ]);
+        alert('Todos tus datos locales han sido eliminados correctamente.');
+        setShowDangerModal(false);
+        setConfirmDeleteText('');
+        window.location.reload();
+        return;
+      }
+
       if (!user) throw new Error('No hay sesión de usuario activa.');
 
       // Orden estricto: clases → grupos → periodos → tarifas
       const { error: errClases } = await supabase
         .from('clases')
         .delete()
-        .eq('user_id', user.id);
+        .eq('user_id', currentUserId);
       if (errClases) throw new Error(`Error al eliminar clases: ${errClases.message}`);
 
       const { error: errGrupos } = await supabase
         .from('grupos')
         .delete()
-        .eq('user_id', user.id);
+        .eq('user_id', currentUserId);
       if (errGrupos) throw new Error(`Error al eliminar grupos: ${errGrupos.message}`);
 
       const { error: errPeriodos } = await supabase
         .from('periodos')
         .delete()
-        .eq('user_id', user.id);
+        .eq('user_id', currentUserId);
       if (errPeriodos) throw new Error(`Error al eliminar periodos: ${errPeriodos.message}`);
 
       const { error: errTarifas } = await supabase
         .from('tarifas')
         .delete()
-        .eq('user_id', user.id);
+        .eq('user_id', currentUserId);
       if (errTarifas) throw new Error(`Error al eliminar tarifas: ${errTarifas.message}`);
 
       alert('Todos tus datos han sido eliminados correctamente.');
@@ -632,15 +687,16 @@ export default function Configuracion() {
   ];
 
   return (
-    <div className="space-y-8 animate-fade-in max-w-2xl">
-      <div>
+    <div className="animate-fade-in max-w-2xl">
+      <div className="hidden md:block mb-8">
         <h1 className="text-2xl font-semibold text-zinc-900 dark:text-white">Configuración</h1>
         <p className="text-sm text-zinc-500 mt-1">Personaliza la app y gestiona tarifas</p>
       </div>
 
-      {/* ── Cuenta activa ── */}
-      {currentUser && (
-        <Card>
+      <div className="space-y-6 md:space-y-8">
+        {/* ── Cuenta activa / Almacenamiento Local ── */}
+        {currentUser ? (
+          <Card>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-[var(--accent-color)]/15 flex items-center justify-center shrink-0">
               <User size={18} className="text-[var(--accent-color)]" />
@@ -650,7 +706,20 @@ export default function Configuracion() {
               <p className="text-sm font-semibold text-zinc-900 dark:text-white truncate">{currentUser.email}</p>
               <p className="text-xs text-zinc-400 font-mono truncate">{currentUser.id}</p>
             </div>
-            <span className="text-xs px-2 py-1 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 font-medium shrink-0">Activa</span>
+            <span className="text-xs px-2 py-1 rounded-full bg-[var(--accent-color)]/10 text-[var(--accent-color)] font-medium shrink-0">Activa</span>
+          </div>
+        </Card>
+      ) : (
+        <Card>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-[var(--accent-color)]/10 flex items-center justify-center shrink-0">
+              <HardDrive size={18} className="text-[var(--accent-color)]" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-zinc-900 dark:text-white truncate">Almacenamiento Local</p>
+              <p className="text-xs text-zinc-400">Tus datos se guardan de forma privada en tu navegador</p>
+            </div>
+            <span className="text-xs px-2 py-1 rounded-full bg-[var(--accent-color)]/10 text-[var(--accent-color)] font-medium shrink-0">Local</span>
           </div>
         </Card>
       )}
@@ -846,15 +915,17 @@ export default function Configuracion() {
       </Modal>
 
       {/* ── Logout (Mobile Alternative) ── */}
-      <div className="md:hidden pt-4 pb-8">
-        <Button
-          variant="danger"
-          className="w-full"
-          onClick={() => setShowLogoutConfirm(true)}
-        >
-          <LogOut size={16} /> Cerrar Sesión
-        </Button>
-      </div>
+      {!isOffline && (
+        <div className="md:hidden pt-4 pb-8">
+          <Button
+            variant="danger"
+            className="w-full"
+            onClick={() => setShowLogoutConfirm(true)}
+          >
+            <LogOut size={16} /> Cerrar Sesión
+          </Button>
+        </div>
+      )}
 
       {/* Modal Importador */}
       <Modal
@@ -958,6 +1029,7 @@ export default function Configuracion() {
           </div>
         </div>
       </Modal>
+      </div>
     </div>
   );
 }

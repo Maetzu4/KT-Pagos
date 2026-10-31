@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { ClipboardPaste, CheckCircle2, AlertCircle, Loader2, Upload, ExternalLink, Code2, ChevronDown, ChevronUp } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
+import { useAuth } from '../hooks/useAuth';
+import { localDb, generateLocalId } from '../lib/localDb';
 import { generarClasesParaGrupo } from '../lib/generadorClases';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
@@ -124,6 +126,9 @@ const STEP = {
 
 // ─── Componente principal ────────────────────────────────────────────────────
 export function ImportadorJSON() {
+  const { isOffline, user } = useAuth();
+  const currentUserId = user?.id || 'local-user';
+
   const [step,        setStep]        = useState(STEP.IDLE);
   const [grupos,      setGrupos]      = useState([]);
   const [mensaje,     setMensaje]     = useState('');
@@ -208,28 +213,42 @@ export function ImportadorJSON() {
     setMensaje('');
 
     try {
-      // Obtener user_id de la sesión activa
-      const { data: { user }, error: authErr } = await supabase.auth.getUser();
-      if (authErr || !user) {
-        setMensaje('No hay sesión activa. Por favor inicia sesión nuevamente.');
-        setStep(STEP.ERROR);
-        return;
+      let activeUserId = currentUserId;
+
+      if (!isOffline) {
+        // Obtener user_id de la sesión activa en Supabase
+        const { data: { user: sbUser }, error: authErr } = await supabase.auth.getUser();
+        if (authErr || !sbUser) {
+          setMensaje('No hay sesión activa. Por favor inicia sesión nuevamente.');
+          setStep(STEP.ERROR);
+          return;
+        }
+        activeUserId = sbUser.id;
       }
 
       // ── FASE 0: Validación Previa (Protección contra duplicados) ─────────
       // Consultar TODOS los grupos existentes para no duplicar ni violar grupos_id_externo_key
-      const { data: existentesDB, error: existErr } = await supabase
-        .from('grupos')
-        .select('id, id_externo, nombre_grupo')
-        .eq('user_id', user.id);
+      let existentes = [];
+      if (isOffline) {
+        existentes = await localDb.grupos
+          .where('user_id')
+          .equals(activeUserId)
+          .toArray();
+      } else {
+        const { data: existentesDB, error: existErr } = await supabase
+          .from('grupos')
+          .select('id, id_externo, nombre_grupo')
+          .eq('user_id', activeUserId);
 
-      if (existErr) throw new Error(existErr.message);
+        if (existErr) throw new Error(existErr.message);
+        existentes = existentesDB || [];
+      }
 
       const setExistentesPorIdExt = new Set(
-        (existentesDB || []).map((e) => e.id_externo).filter(Boolean)
+        existentes.map((e) => e.id_externo).filter(Boolean)
       );
       const setExistentesPorNombre = new Set(
-        (existentesDB || []).map((e) => e.nombre_grupo).filter(Boolean)
+        existentes.map((e) => e.nombre_grupo).filter(Boolean)
       );
 
       // Separar el flujo en gruposNuevos y gruposOmitidos (la información existente no se modifica)
@@ -238,7 +257,7 @@ export function ImportadorJSON() {
 
       for (const g of grupos) {
         const idExt = getIdExterno(g);
-        const mapped = mapGrupo(g, user.id);
+        const mapped = mapGrupo(g, activeUserId);
         const yaExiste = (idExt && setExistentesPorIdExt.has(idExt))
           || (mapped.nombre_grupo && setExistentesPorNombre.has(mapped.nombre_grupo));
 
@@ -267,14 +286,23 @@ export function ImportadorJSON() {
       }
 
       // ── Cargar tarifas ANTES de Fase 1 para el cruce en el insert ─────────
-      const { data: tarifasDB, error: tarifasErr } = await supabase
-        .from('tarifas')
-        .select('id, duracion_minutos')
-        .eq('user_id', user.id)
-        .order('duracion_minutos', { ascending: true });
+      let tarifas = [];
+      if (isOffline) {
+        tarifas = await localDb.tarifas
+          .where('user_id')
+          .equals(activeUserId)
+          .toArray();
+        tarifas.sort((a, b) => (a.duracion_minutos ?? 0) - (b.duracion_minutos ?? 0));
+      } else {
+        const { data: tarifasDB, error: tarifasErr } = await supabase
+          .from('tarifas')
+          .select('id, duracion_minutos')
+          .eq('user_id', activeUserId)
+          .order('duracion_minutos', { ascending: true });
 
-      if (tarifasErr) console.error('Error cargando tarifas:', tarifasErr);
-      const tarifas        = tarifasDB ?? [];
+        if (tarifasErr) console.error('Error cargando tarifas:', tarifasErr);
+        tarifas = tarifasDB ?? [];
+      }
       const tarifaFallback = tarifas[0] ?? null;
 
       // ── FASE 1: Inserción de grupos estrictamente NUEVOS ───────────────────
@@ -284,7 +312,7 @@ export function ImportadorJSON() {
       const gruposInsertados = [];
 
       for (const g of gruposNuevos) {
-        const raw = mapGrupo(g, user.id);
+        const raw = mapGrupo(g, activeUserId);
         const tarifaMatch = tarifas.find(t => t.duracion_minutos === g.curso?.duracionMinutos)
           ?? tarifaFallback;
 
@@ -292,7 +320,7 @@ export function ImportadorJSON() {
         const resolvedInicioCobro = !isNaN(inicioCobroNum) && inicioCobroNum >= 1 ? inicioCobroNum : 1;
 
         const payload = {
-          user_id: user.id,
+          user_id: activeUserId,
           nombre_grupo: raw.nombre_grupo,
           estado: raw.estado || 'activo',
           id_externo: raw.id_externo ?? null,
@@ -307,34 +335,58 @@ export function ImportadorJSON() {
           tarifa_id: tarifaMatch?.id ?? null,
         };
 
-        delete payload.id;
+        if (isOffline) {
+          try {
+            payload.id = generateLocalId();
+            await localDb.grupos.put(payload);
+            const fila = {
+              id: payload.id,
+              nombre_grupo: payload.nombre_grupo,
+              user_id: payload.user_id,
+              fecha_inicio_grupo: payload.fecha_inicio_grupo,
+              lecciones_totales: payload.lecciones_totales,
+              horario: payload.horario,
+              duracion_minutos: payload.duracion_minutos,
+              tarifa_id: payload.tarifa_id,
+              leccion_inicio_cobro: payload.leccion_inicio_cobro,
+            };
+            gruposInsertados.push(fila);
+            gruposOk++;
+          } catch (err) {
+            console.error('Error insertando grupo local:', err);
+            gruposErr++;
+            erroresGrupos.push(`"${payload.nombre_grupo}": ${err.message}`);
+          }
+        } else {
+          delete payload.id;
 
-        try {
-          const { data: fila, error: saveErr } = await supabase
-            .from('grupos')
-            .insert(payload)
-            .select('id, nombre_grupo, user_id, fecha_inicio_grupo, lecciones_totales, horario, duracion_minutos, tarifa_id, leccion_inicio_cobro')
-            .single();
+          try {
+            const { data: fila, error: saveErr } = await supabase
+              .from('grupos')
+              .insert(payload)
+              .select('id, nombre_grupo, user_id, fecha_inicio_grupo, lecciones_totales, horario, duracion_minutos, tarifa_id, leccion_inicio_cobro')
+              .single();
 
-          if (saveErr) {
-            // Si ya existe en la base de datos (clave duplicada o conflicto de id_externo), omitir limpiamente
-            if (saveErr.code === '23505' || saveErr.message?.includes('unique constraint') || saveErr.message?.includes('duplicate key')) {
+            if (saveErr) {
+              // Si ya existe en la base de datos (clave duplicada o conflicto de id_externo), omitir limpiamente
+              if (saveErr.code === '23505' || saveErr.message?.includes('unique constraint') || saveErr.message?.includes('duplicate key')) {
+                gruposOmitidos.push(g);
+                continue;
+              }
+              throw saveErr;
+            }
+
+            if (fila) gruposInsertados.push(fila);
+            gruposOk++;
+          } catch (err) {
+            if (err.code === '23505' || err.message?.includes('unique constraint') || err.message?.includes('duplicate key')) {
               gruposOmitidos.push(g);
               continue;
             }
-            throw saveErr;
+            console.error('Error insertando grupo nuevo:', err);
+            gruposErr++;
+            erroresGrupos.push(`"${payload.nombre_grupo}": ${err.message}`);
           }
-
-          if (fila) gruposInsertados.push(fila);
-          gruposOk++;
-        } catch (err) {
-          if (err.code === '23505' || err.message?.includes('unique constraint') || err.message?.includes('duplicate key')) {
-            gruposOmitidos.push(g);
-            continue;
-          }
-          console.error('Error insertando grupo nuevo:', err);
-          gruposErr++;
-          erroresGrupos.push(`"${payload.nombre_grupo}": ${err.message}`);
         }
       }
 
@@ -354,7 +406,7 @@ export function ImportadorJSON() {
         try {
           const lote = generarClasesParaGrupo({
             ...grupo,
-            user_id: user.id, // Forzar inyección de user_id en el generador
+            user_id: activeUserId, // Forzar inyección de user_id en el generador
           });
           console.log(`Clases generadas para "${grupo.nombre_grupo}":`, lote.length);
           todasLasClases.push(...lote);
@@ -368,10 +420,9 @@ export function ImportadorJSON() {
       console.log('Total de clases generadas en memoria:', todasLasClases.length);
 
       if (todasLasClases.length > 0) {
-        console.log('Enviando a Supabase...');
-        // Inyección obligatoria de user.id en cada clase antes de insertar con objeto estrictamente plano
         const clasesToInsert = todasLasClases.map((c) => ({
-          user_id: user.id,
+          id: c.id || generateLocalId(),
+          user_id: activeUserId,
           grupo_id: c.grupo_id,
           fecha_clase: c.fecha_clase,
           estado_clase: c.estado_clase || 'Programada',
@@ -380,17 +431,28 @@ export function ImportadorJSON() {
           nombre_clase: c.nombre_clase ?? null,
           precio_cobrado: c.precio_cobrado != null ? Number(c.precio_cobrado) : null,
           periodo_id: c.periodo_id ?? null,
+          fue_aplazada: Boolean(c.fue_aplazada),
         }));
 
-        const CHUNK = 100;
-        for (let i = 0; i < clasesToInsert.length; i += CHUNK) {
-          const { error: cErr } = await supabase
-            .from('clases')
-            .insert(clasesToInsert.slice(i, i + CHUNK));
-          if (cErr) throw new Error(`Error insertando clases: ${cErr.message}`);
+        if (isOffline) {
+          console.log('Insertando clases en IndexedDB (localDb)...');
+          await localDb.clases.bulkPut(clasesToInsert);
+          clasesOk = clasesToInsert.length;
+          console.log('Clases insertadas correctamente en localDb:', clasesOk);
+        } else {
+          console.log('Enviando a Supabase...');
+          // En Supabase enviamos los datos planos sin forzar ID local
+          const clasesOnline = clasesToInsert.map(({ id, ...resto }) => resto);
+          const CHUNK = 100;
+          for (let i = 0; i < clasesOnline.length; i += CHUNK) {
+            const { error: cErr } = await supabase
+              .from('clases')
+              .insert(clasesOnline.slice(i, i + CHUNK));
+            if (cErr) throw new Error(`Error insertando clases: ${cErr.message}`);
+          }
+          clasesOk = clasesOnline.length;
+          console.log('Clases insertadas correctamente en Supabase:', clasesOk);
         }
-        clasesOk = clasesToInsert.length;
-        console.log('Clases insertadas correctamente:', clasesOk);
       }
 
       // ── Resultado final ──────────────────────────────────────────────────
@@ -639,7 +701,7 @@ export function ImportadorJSON() {
       {step === STEP.SAVING && (
         <div className="flex flex-col items-center gap-4 py-12">
           <Loader2 size={32} className="text-[var(--accent-color)] animate-spin" />
-          <p className="text-sm text-zinc-500">Guardando grupos en Supabase…</p>
+          <p className="text-sm text-zinc-500">Guardando grupos…</p>
         </div>
       )}
 

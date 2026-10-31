@@ -178,6 +178,12 @@ export default function Login() {
                 Regístrate
               </Link>
             </p>
+
+            <p className="text-center text-xs text-zinc-400 mt-5 pt-3 border-t border-zinc-100 dark:border-zinc-800">
+              <Link to="/" className="hover:text-[var(--accent-color)] transition-colors">
+                ← Continuar en Modo Local
+              </Link>
+            </p>
           </>
         )}
       </div>

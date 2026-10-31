@@ -278,10 +278,10 @@ export default function Bonos() {
   const isCurrentPeriod = Boolean(periodo && periodoActual && periodo.key_periodo === periodoActual.key_periodo);
 
   return (
-    <div className="space-y-8 animate-fade-in">
+    <div className="space-y-6 md:space-y-8 animate-fade-in">
       {/* ── Cabecera ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
+        <div className="hidden md:flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl bg-[var(--accent-color)]/10 flex items-center justify-center shrink-0">
             <Trophy size={20} className="text-[var(--accent-color)]" />
           </div>

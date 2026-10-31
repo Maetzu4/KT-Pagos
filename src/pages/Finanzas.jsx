@@ -130,22 +130,22 @@ export default function Finanzas() {
   const animHeroDeuda = useCountUp(loading ? 0 : heroDeudaAnterior);
 
   return (
-    <div className="space-y-8 animate-fade-in">
+    <div className="space-y-6 md:space-y-8 animate-fade-in">
       {/* ── Cabecera con Único Selector de Año en la misma fila horizontal ── */}
       <div className="flex flex-row justify-between items-start gap-4">
-        <div>
+        <div className="hidden md:block">
           <h1 className="text-2xl font-semibold text-zinc-900 dark:text-white">Finanzas</h1>
           <p className="text-sm text-zinc-500 mt-0.5">Cortes mensuales y seguimiento de pagos</p>
         </div>
 
         {/* Único Selector: Año */}
-        <div className="w-28 sm:w-36 shrink-0">
+        <div className="w-full md:w-auto shrink-0">
           <CustomSelect
             value={filtroAnio}
             onChange={setFiltroAnio}
             options={aniosDisponibles}
             placeholder="Año"
-            className="bg-zinc-100 dark:bg-zinc-800/50 border-0 rounded-xl font-medium focus:ring-2 focus:ring-[var(--accent-color)] text-xs sm:text-sm"
+            className="w-full md:w-36 bg-zinc-100 dark:bg-zinc-800/50 border-0 rounded-xl font-medium focus:ring-2 focus:ring-[var(--accent-color)] text-xs sm:text-sm"
           />
         </div>
       </div>

@@ -5,17 +5,10 @@ import { Table } from '../components/ui/Table';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
-import { CustomSelect } from '../components/ui/CustomSelect';
 import { GrupoDetailModal } from '../components/ui/GrupoDetailModal';
 import { GrupoForm } from '../components/forms/GrupoForm';
 import { GestionarExtrasModal } from '../components/modals/GestionarExtrasModal';
 import { useGrupos } from '../hooks/useGrupos';
-
-const ESTADO_OPTIONS = [
-  { value: 'Todos', label: 'Todos' },
-  { value: 'Activo', label: 'Activo' },
-  { value: 'Archivado', label: 'Archivado' },
-];
 
 // ── Vista Principal ────────────────────────────────────────────────────────────
 export default function Grupos() {
@@ -25,30 +18,24 @@ export default function Grupos() {
   const [detalle,            setDetalle]            = useState(null);   // grupo para modal de detalle
   const [deleting,           setDeleting]           = useState(null);
   const [search,             setSearch]             = useState('');
-  const [filtroEstado,       setFiltroEstado]       = useState('Todos');
   const [confirmId,          setConfirmId]          = useState(null);
   const [showGestionExtras,  setShowGestionExtras]  = useState(false);
 
   const gruposFiltrados = grupos
     .filter((g) => {
-      // Filtro por estado
-      if (filtroEstado === 'Activo' && g.estado?.toLowerCase() !== 'activo') {
-        return false;
-      }
-      if (filtroEstado === 'Archivado') {
-        const est = g.estado?.toLowerCase();
-        if (est !== 'archivado' && est !== 'finalizado') {
-          return false;
-        }
-      }
-      // Filtro por búsqueda de texto
-      if (search.trim()) {
-        const q = search.trim().toLowerCase();
-        if (!g.nombre_grupo?.toLowerCase().includes(q)) {
-          return false;
-        }
-      }
-      return true;
+      if (!search.trim()) return true;
+      const q = search.trim().toLowerCase();
+      const nombre = (g.nombre_grupo ?? '').toLowerCase();
+      const idExterno = (g.id_externo ?? '').toLowerCase();
+      const horario = (g.horario ?? '').toLowerCase();
+      const estado = (g.estado ?? '').toLowerCase();
+
+      return (
+        nombre.includes(q) ||
+        idExterno.includes(q) ||
+        horario.includes(q) ||
+        estado.includes(q)
+      );
     })
     .slice()
     .sort((a, b) => {
@@ -152,44 +139,54 @@ export default function Grupos() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
-        <div>
+      <div className="flex flex-col md:flex-row md:items-center gap-3 justify-between">
+        {/* Título — solo desktop */}
+        <div className="hidden md:block">
           <h1 className="text-2xl font-semibold text-zinc-900 dark:text-white">Grupos</h1>
           <p className="text-sm text-zinc-500 mt-1">
             {gruposFiltrados.length} de {grupos.length} grupos
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Barra de búsqueda */}
-          <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+
+        {/* Fila principal: búsqueda y nuevo grupo en la misma fila con flex gap-2 en móvil */}
+        <div className="flex items-center gap-2 w-full md:w-auto">
+          {/* Barra de búsqueda con contador flotante dentro */}
+          <div className="relative flex-1 md:w-56">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none" />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Buscar grupo…"
-              className="w-52 h-9 pl-9 pr-3 text-sm rounded-lg bg-white dark:bg-white/5 border border-zinc-300 dark:border-white/10 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none focus:border-[var(--accent-color)] focus:ring-1 focus:ring-[var(--accent-color)]/30 transition-all duration-200"
+              className="w-full h-9 pl-9 pr-14 text-sm rounded-xl bg-white dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none focus:border-[var(--accent-color)] focus:ring-1 focus:ring-[var(--accent-color)]/30 transition-all duration-200"
             />
+            {/* Contador flotante a la derecha dentro del input */}
+            <span className="text-[10px] text-zinc-400 dark:text-zinc-500 absolute right-3 top-2.5 tabular-nums pointer-events-none font-medium">
+              {gruposFiltrados.length}/{grupos.length}
+            </span>
           </div>
-          {/* Filtro por estado */}
-          <div className="w-36">
-            <CustomSelect
-              value={filtroEstado}
-              onChange={setFiltroEstado}
-              options={ESTADO_OPTIONS}
-              placeholder="Estado"
-              className="!h-9"
-            />
-          </div>
+
+          {/* Gestionar Extras — compacto en móvil (solo icono), texto en desktop */}
           <Button
             variant="secondary"
             onClick={() => setShowGestionExtras(true)}
             id="btn-gestionar-extras"
+            className="!h-9 px-3 shrink-0 text-xs shadow-sm"
+            title="Gestionar Extras"
           >
-            <SlidersHorizontal size={15} /> Gestionar Extras
+            <SlidersHorizontal size={14} />
+            <span className="hidden sm:inline ml-1">Gestionar Extras</span>
           </Button>
-          <Button onClick={openCreate} id="btn-crear-grupo">
-            <Plus size={16} /> Nuevo Grupo
+
+          {/* Nuevo Grupo — compacto en móvil (+ icono), texto en desktop */}
+          <Button
+            onClick={openCreate}
+            id="btn-crear-grupo"
+            className="!h-9 px-3 shrink-0 shadow-sm text-xs"
+            title="Nuevo Grupo"
+          >
+            <Plus size={16} />
+            <span className="hidden sm:inline ml-1">Nuevo Grupo</span>
           </Button>
         </div>
       </div>
@@ -200,8 +197,8 @@ export default function Grupos() {
         data={gruposFiltrados}
         loading={loading}
         emptyMessage={
-          search || filtroEstado !== 'Todos'
-            ? 'Sin resultados para los filtros aplicados'
+          search.trim()
+            ? 'Sin resultados para la búsqueda'
             : 'No hay grupos. Crea uno con el botón de arriba.'
         }
         onRowClick={(g) => setDetalle(g)}

@@ -1,10 +1,9 @@
-import { useState, useEffect } from 'react';
-import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Users, BarChart3, Settings, LogOut, Trophy, User } from 'lucide-react';
-import { supabase } from '../../lib/supabaseClient';
-import { useTheme } from '../../context/ThemeContext';
-import { ConfirmDialog } from './ConfirmDialog';
+import { useRef } from 'react';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
+import { LayoutDashboard, Users, BarChart3, Settings, Trophy } from 'lucide-react';
+import { useAuth } from '../../hooks/useAuth';
 import { cn } from '../../lib/utils';
+import { Sidebar } from './Sidebar';
 
 const NAV_ITEMS = [
   { to: '/',              icon: LayoutDashboard, label: 'Dashboard' },
@@ -14,106 +13,107 @@ const NAV_ITEMS = [
   { to: '/configuracion', icon: Settings,         label: 'Config'    },
 ];
 
-export function Navbar() {
-  const { mode } = useTheme();
-  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-  const [userEmail, setUserEmail] = useState(null);
+const PAGE_TITLES = {
+  '/':              'Dashboard',
+  '/finanzas':      'Finanzas',
+  '/bonos':         'Bonos',
+  '/grupos':        'Grupos',
+  '/configuracion': 'Configuración',
+};
 
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) setUserEmail(user.email);
-    });
-  }, []);
+export function Navbar() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { isOffline } = useAuth();
+
+  const currentTitle = PAGE_TITLES[location.pathname] || 'KT-Pagos';
+  const activeIdx = NAV_ITEMS.findIndex(({ to }) =>
+    to === '/' ? location.pathname === '/' : location.pathname.startsWith(to)
+  );
+
+  // Acción oculta de 5 clics vinculada a Configuración (móvil)
+  const clickCountRef = useRef(0);
+  const clickTimerRef = useRef(null);
+  const lastTriggerRef = useRef(0);
+
+  const handleSecretAccess = () => {
+    const now = Date.now();
+    // Evita contar doble si el móvil dispara touchstart y click casi simultáneos
+    if (now - lastTriggerRef.current < 100) return;
+    lastTriggerRef.current = now;
+
+    clickCountRef.current += 1;
+    if (clickCountRef.current >= 5) {
+      clickCountRef.current = 0;
+      if (clickTimerRef.current) clearTimeout(clickTimerRef.current);
+      navigate('/acceso-privado');
+      return;
+    }
+
+    if (clickTimerRef.current) clearTimeout(clickTimerRef.current);
+    clickTimerRef.current = setTimeout(() => {
+      clickCountRef.current = 0;
+    }, 2500);
+  };
 
   return (
     <>
+      {/* ── Top Header Translúcido (Móvil) ── */}
+      <header className="md:hidden sticky top-0 z-40 bg-white/60 dark:bg-zinc-950/60 backdrop-blur-md border-b border-zinc-200 dark:border-zinc-800 px-4 py-3.5 flex items-center justify-between">
+        <div className="flex items-center gap-2.5 select-none">
+          <img src="/favicon.svg" alt="KT-Pagos Logo" className="w-7 h-7 rounded-lg shadow-sm" />
+          <span className="text-zinc-900 dark:text-white font-semibold text-base">
+            {currentTitle}
+          </span>
+        </div>
+
+        {/* Badge píldora sólida "LOCAL" a la derecha */}
+        {isOffline && (
+          <span className="bg-[var(--accent-color)] text-white px-3 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase shadow-sm">
+            Local
+          </span>
+        )}
+      </header>
+
       {/* ── Sidebar para escritorio ─────────────────────────────────── */}
-      <nav className="hidden md:flex flex-col fixed left-0 top-0 h-full w-16 lg:w-56
-                      bg-white border-r border-zinc-200 dark:bg-zinc-950 dark:border-zinc-800 z-40 py-6 transition-all">
-        {/* Logo */}
-        <div className="px-4 mb-8 flex items-center gap-3">
-          <img src="/favicon.svg" alt="KT-Pagos Logo" className="w-9 h-9 rounded-xl shadow-sm hover:opacity-90 transition-opacity" />
-          <span className="hidden lg:block text-zinc-900 dark:text-white font-semibold text-sm">KT-Pagos</span>
-        </div>
+      <Sidebar />
 
-        {/* Links */}
-        <div className="flex flex-col gap-1.5 px-2 flex-1">
-          {NAV_ITEMS.map(({ to, icon: Icon, label }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={to === '/'}
-              className={({ isActive }) => cn(
-                'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm',
-                'transition-all duration-200 ease-in-out group relative',
-                isActive
-                  ? 'bg-[var(--accent-color)] text-white shadow-md font-medium'
-                  : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-white/5 font-normal'
-              )}
-            >
-              <Icon size={18} className="shrink-0 transition-transform duration-200 group-hover:scale-110" />
-              <span className="hidden lg:block">{label}</span>
-            </NavLink>
-          ))}
-        </div>
-
-        {/* Cuenta + Botón Logout (Desktop) */}
-        <div className="mt-auto px-2 space-y-1">
-          {userEmail && (
-            <div className="hidden lg:flex items-center gap-2 px-3 py-2 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 mb-1">
-              <div className="w-6 h-6 rounded-full bg-[var(--accent-color)]/20 flex items-center justify-center shrink-0">
-                <User size={12} className="text-[var(--accent-color)]" />
-              </div>
-              <span className="text-xs text-zinc-500 dark:text-zinc-400 truncate" title={userEmail}>{userEmail}</span>
-            </div>
+      {/* ── Bottom Navigation Translúcido (Móvil) ── */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/60 dark:bg-zinc-950/60 backdrop-blur-md border-t border-zinc-200 dark:border-zinc-800 py-2 safe-area-inset-bottom">
+        <div className="relative flex w-full justify-around items-center">
+          {/* Fondo animado sliding pill */}
+          {activeIdx >= 0 && (
+            <div
+              className="absolute top-1/2 -translate-y-1/2 h-10 w-[60px] bg-[var(--accent-color)] rounded-xl transition-all duration-300 ease-out pointer-events-none"
+              style={{
+                left: `calc(${(activeIdx * 100) / NAV_ITEMS.length}% + calc(100% / ${NAV_ITEMS.length * 2}) - 30px)`,
+              }}
+            />
           )}
-          <button
-            onClick={() => setShowLogoutConfirm(true)}
-            className={cn(
-              'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-zinc-600 dark:text-zinc-400',
-              'hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30 dark:hover:text-red-400',
-              'transition-all duration-200 ease-in-out group relative'
-            )}
-          >
-            <LogOut size={18} className="shrink-0 transition-transform duration-200 group-hover:scale-110" />
-            <span className="hidden lg:block font-medium">Cerrar Sesión</span>
-          </button>
+
+          {NAV_ITEMS.map(({ to, icon: Icon }) => {
+            const isActive = to === '/' ? location.pathname === '/' : location.pathname.startsWith(to);
+            return (
+              <NavLink
+                key={to}
+                to={to}
+                end={to === '/'}
+                onClick={to === '/configuracion' ? handleSecretAccess : undefined}
+                onTouchStart={to === '/configuracion' ? handleSecretAccess : undefined}
+                className="z-10 relative bg-transparent p-2 flex items-center justify-center cursor-pointer"
+              >
+                <Icon
+                  size={22}
+                  className={cn(
+                    'transition-colors duration-200',
+                    isActive ? 'text-white' : 'text-zinc-500 dark:text-zinc-400'
+                  )}
+                />
+              </NavLink>
+            );
+          })}
         </div>
       </nav>
-
-      {/* ── Bottom bar para móvil ────────────────────────────────────── */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40
-                      bg-white/95 border-t border-zinc-200 dark:bg-zinc-950/95 dark:border-zinc-800 backdrop-blur-md
-                      flex items-center justify-around px-2 py-1.5 safe-area-inset-bottom">
-        {NAV_ITEMS.map(({ to, icon: Icon, label }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={to === '/'}
-            className={({ isActive }) => cn(
-              'flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl text-xs',
-              'transition-all duration-200 ease-in-out',
-              isActive
-                ? 'bg-[var(--accent-color)] text-white shadow-sm font-medium'
-                : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-white/5'
-            )}
-          >
-            <Icon size={20} className="transition-transform duration-200" />
-            <span>{label}</span>
-          </NavLink>
-        ))}
-      </nav>
-
-      {/* Confirmación de Logout */}
-      <ConfirmDialog
-        open={showLogoutConfirm}
-        title="Cerrar Sesión"
-        message="¿Estás seguro de que deseas salir?"
-        confirmText="Salir"
-        onConfirm={() => supabase.auth.signOut()}
-        onCancel={() => setShowLogoutConfirm(false)}
-        destructive
-      />
     </>
   );
 }

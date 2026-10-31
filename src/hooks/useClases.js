@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase, getCurrentUser } from '../lib/supabaseClient';
+import { useAuth } from './useAuth';
+import { localDb, generateLocalId } from '../lib/localDb';
 import { addDays, format, parseISO } from 'date-fns';
 
 // Caché en memoria indexado por filtros de consulta para acelerar re-visitas
@@ -35,11 +37,10 @@ const SELECT_CLASES_OPTIMIZADO = `
 
 /**
  * Aplaza masivamente todas las clases de un grupo desde una fecha dada,
- * empujando su fecha_clase exactamente 7 días hacia el futuro y marcándolas
- * con fue_aplazada: true.
+ * empujando su fecha_clase exactamente 7 días hacia el futuro y manteniendo
+ * el estado fue_aplazada original.
  *
- * Exportada como función standalone para poder usarla desde cualquier componente
- * sin necesidad de instanciar el hook useClases completo.
+ * Soporta ejecución tanto en modo offline (IndexedDB) como online (Supabase).
  *
  * @param {string} grupo_id     - UUID del grupo
  * @param {string} fecha_origen - 'YYYY-MM-DD' — se aplaza esta clase y TODAS las posteriores
@@ -49,8 +50,35 @@ export async function aplazarClasesMasivo(grupo_id, fecha_origen) {
   if (!grupo_id || !fecha_origen) throw new Error('grupo_id y fecha_origen son requeridos.');
 
   const user = await getCurrentUser();
-  if (!user) throw new Error('No hay sesión activa.');
+  const isOffline = !user;
+  const currentUserId = user?.id || 'local-user';
 
+  // ── Modo local (IndexedDB) ──────────────────────────────────────────────────
+  if (isOffline) {
+    const todasClases = await localDb.clases
+      .where('user_id')
+      .equals(currentUserId)
+      .toArray();
+
+    const clasesAfectadas = todasClases.filter(
+      (c) => String(c.grupo_id) === String(grupo_id) && c.fecha_clase >= fecha_origen
+    );
+
+    if (clasesAfectadas.length === 0) return 0;
+
+    for (const c of clasesAfectadas) {
+      const fechaOriginal = String(c.fecha_clase).split('T')[0].split(' ')[0];
+      const nuevaFecha = format(addDays(parseISO(fechaOriginal), 7), 'yyyy-MM-dd');
+      await localDb.clases.update(c.id, {
+        fecha_clase: nuevaFecha,
+      });
+    }
+
+    clasesCache.clear();
+    return clasesAfectadas.length;
+  }
+
+  // ── Modo online (Supabase) ──────────────────────────────────────────────────
   // 1. Obtener todas las clases del grupo desde la fecha origen (inclusive)
   const { data: clasesAfectadas, error: fetchErr } = await supabase
     .from('clases')
@@ -92,7 +120,10 @@ export async function aplazarClasesMasivo(grupo_id, fecha_origen) {
 }
 
 export function useClases(filtros = {}) {
-  const cacheKey = `${filtros.grupo_id || ''}_${filtros.fecha_inicio || ''}_${filtros.fecha_fin || ''}_${filtros.periodo_id || ''}`;
+  const { isOffline, user } = useAuth();
+  const currentUserId = user?.id || 'local-user';
+
+  const cacheKey = `${filtros.grupo_id || ''}_${filtros.fecha_inicio || ''}_${filtros.fecha_fin || ''}_${filtros.periodo_id || ''}_${isOffline ? 'local' : 'remote'}`;
 
   const [clases, setClases] = useState(() => {
     const cached = clasesCache.get(cacheKey);
@@ -106,13 +137,69 @@ export function useClases(filtros = {}) {
     if (!force && cached && cached.length > 0) {
       setClases(cached);
       setLoading(false);
-    } else if (!cached || cached.length === 0) {
-      setLoading(true);
+      return;
     }
+
+    setLoading(true);
     setError(null);
 
-    const user = await getCurrentUser();
-    if (!user) {
+    // ── Modo local (IndexedDB) ────────────────────────────────────────────────
+    if (isOffline) {
+      try {
+        const [rawClases, rawGrupos, rawTarifas] = await Promise.all([
+          localDb.clases.where('user_id').equals(currentUserId).toArray(),
+          localDb.grupos.where('user_id').equals(currentUserId).toArray(),
+          localDb.tarifas.where('user_id').equals(currentUserId).toArray(),
+        ]);
+
+        const tarifasMap = new Map(rawTarifas.map((t) => [t.id, t]));
+        const gruposMap = new Map(
+          rawGrupos.map((g) => [
+            g.id,
+            {
+              ...g,
+              tarifas: tarifasMap.get(g.tarifa_id) || null,
+            },
+          ])
+        );
+
+        let filtradas = rawClases;
+
+        if (filtros.grupo_id) {
+          filtradas = filtradas.filter((c) => String(c.grupo_id) === String(filtros.grupo_id));
+        }
+        if (filtros.fecha_inicio) {
+          filtradas = filtradas.filter((c) => c.fecha_clase >= filtros.fecha_inicio);
+        }
+        if (filtros.fecha_fin) {
+          filtradas = filtradas.filter((c) => c.fecha_clase <= filtros.fecha_fin);
+        }
+        if (filtros.periodo_id && !String(filtros.periodo_id).startsWith('virtual-')) {
+          filtradas = filtradas.filter((c) => String(c.periodo_id) === String(filtros.periodo_id));
+        }
+
+        // Ordenar descendente por fecha_clase
+        filtradas.sort((a, b) => (b.fecha_clase ?? '').localeCompare(a.fecha_clase ?? ''));
+
+        const resultado = filtradas.map((c) => ({
+          ...c,
+          grupos: gruposMap.get(c.grupo_id) || null,
+        }));
+
+        clasesCache.set(cacheKey, resultado);
+        setClases(resultado);
+      } catch (e) {
+        console.error('Error fetching clases local:', e);
+        setError(e.message);
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    // ── Modo online (Supabase) ────────────────────────────────────────────────
+    const onlineUser = await getCurrentUser();
+    if (!onlineUser) {
       setClases([]);
       setLoading(false);
       return;
@@ -121,7 +208,7 @@ export function useClases(filtros = {}) {
     let query = supabase
       .from('clases')
       .select(SELECT_CLASES_OPTIMIZADO)
-      .eq('user_id', user.id)
+      .eq('user_id', onlineUser.id)
       .order('fecha_clase', { ascending: false });
 
     if (filtros.grupo_id) query = query.eq('grupo_id', filtros.grupo_id);
@@ -143,7 +230,7 @@ export function useClases(filtros = {}) {
     clasesCache.set(cacheKey, result);
     setClases(result);
     setLoading(false);
-  }, [cacheKey, filtros.grupo_id, filtros.fecha_inicio, filtros.fecha_fin, filtros.periodo_id]);
+  }, [cacheKey, isOffline, currentUserId, filtros.grupo_id, filtros.fecha_inicio, filtros.fecha_fin, filtros.periodo_id]);
 
   useEffect(() => {
     fetchClases();
@@ -168,12 +255,46 @@ export function useClases(filtros = {}) {
     } = values;
 
     const isAdicional = Boolean(es_adicional ?? es_extra);
-
-    // 1. Obtener tarifa del grupo
     const rawGrupoId = String(grupo_id || '').trim();
     const isPureDigits = /^\d+$/.test(rawGrupoId);
     const resolvedGrupoId = isPureDigits ? Number(rawGrupoId) : rawGrupoId;
 
+    // ── Modo local (IndexedDB) ────────────────────────────────────────────────
+    if (isOffline) {
+      const grupo = await localDb.grupos.get(resolvedGrupoId);
+      const tarifa = grupo?.tarifa_id ? await localDb.tarifas.get(grupo.tarifa_id) : null;
+      const precio_cobrado = isAdicional
+        ? (tarifa?.precio_extra ?? 0)
+        : (tarifa?.precio_regular ?? 0);
+
+      const id = generateLocalId();
+      const insertPayload = {
+        id,
+        grupo_id: resolvedGrupoId,
+        user_id: currentUserId,
+        fecha_clase,
+        nombre_clase: nombre_clase || tema_clase || null,
+        tema_clase: tema_clase || nombre_clase || null,
+        estado_clase: estado_clase || 'Programada',
+        es_adicional: isAdicional,
+        en_reclamo: Boolean(en_reclamo),
+        fue_aplazada: Boolean(values.fue_aplazada),
+        precio_cobrado,
+        periodo_id: null,
+      };
+
+      await localDb.clases.put(insertPayload);
+      const enrichedNewClase = {
+        ...insertPayload,
+        grupos: grupo ? { ...grupo, tarifas: tarifa || null } : null,
+      };
+
+      clasesCache.clear();
+      setClases((prev) => [enrichedNewClase, ...prev]);
+      return enrichedNewClase;
+    }
+
+    // ── Modo online (Supabase) ────────────────────────────────────────────────
     const { data: grupo, error: gErr } = await supabase
       .from('grupos')
       .select('tarifa_id, tarifas(precio_regular, precio_extra)')
@@ -184,14 +305,12 @@ export function useClases(filtros = {}) {
     const tarifa = grupo?.tarifas;
     if (!tarifa) throw new Error('El grupo no tiene tarifa asociada.');
 
-    // Motor de precios: snapshot inmutable
     const precio_cobrado = isAdicional ? tarifa.precio_extra : tarifa.precio_regular;
-
-    const user = await getCurrentUser();
+    const onlineUser = await getCurrentUser();
 
     const insertPayload = {
       grupo_id: resolvedGrupoId,
-      user_id: user?.id ?? null,
+      user_id: onlineUser?.id ?? null,
       fecha_clase,
       nombre_clase: nombre_clase || tema_clase || null,
       tema_clase: tema_clase || nombre_clase || null,
@@ -203,7 +322,6 @@ export function useClases(filtros = {}) {
       periodo_id: null,
     };
 
-    // 2. Insertar la clase
     const { data, error: err } = await supabase
       .from('clases')
       .insert([insertPayload])
@@ -211,13 +329,12 @@ export function useClases(filtros = {}) {
       .single();
     if (err) throw new Error(err.message);
 
-    clasesCache.clear(); // Limpiar caché tras mutación
+    clasesCache.clear();
     setClases((prev) => [data, ...prev]);
     return data;
   };
 
   const updateClase = async (id, values) => {
-    // ── Snapshot Preservation ──
     const { recalc, es_extra, ...cleanValues } = values;
 
     if (es_extra !== undefined && cleanValues.es_adicional === undefined) {
@@ -225,28 +342,6 @@ export function useClases(filtros = {}) {
     }
 
     let finalValues = { ...cleanValues };
-
-    if (recalc) {
-      const rawGrupoId = String(cleanValues.grupo_id || '').trim();
-      const isPureDigits = /^\d+$/.test(rawGrupoId);
-      const resolvedGrupoId = isPureDigits ? Number(rawGrupoId) : rawGrupoId;
-
-      const { data: grupo, error: gErr } = await supabase
-        .from('grupos')
-        .select('tarifa_id, tarifas(precio_regular, precio_extra)')
-        .eq('id', resolvedGrupoId)
-        .single();
-      if (gErr) throw new Error(gErr.message);
-
-      const tarifa = grupo?.tarifas;
-      if (!tarifa) throw new Error('El grupo no tiene tarifa asociada.');
-
-      const precio_cobrado = cleanValues.es_adicional
-        ? tarifa.precio_extra
-        : tarifa.precio_regular;
-
-      finalValues.precio_cobrado = precio_cobrado;
-    }
 
     // Filtrar estrictamente columnas que existen en la tabla clases V2
     const ALLOWED_COLUMNS = new Set([
@@ -270,6 +365,71 @@ export function useClases(filtros = {}) {
       }
     }
 
+    // ── Modo local (IndexedDB) ────────────────────────────────────────────────
+    if (isOffline) {
+      const claseExistente = await localDb.clases.get(id);
+      if (!claseExistente) throw new Error('Clase no encontrada.');
+
+      let precio_cobrado = cleanValues.precio_cobrado !== undefined
+        ? cleanValues.precio_cobrado
+        : claseExistente.precio_cobrado;
+
+      if (recalc) {
+        const grupoId = cleanValues.grupo_id || claseExistente.grupo_id;
+        const grupo = await localDb.grupos.get(grupoId);
+        const tarifa = grupo?.tarifa_id ? await localDb.tarifas.get(grupo.tarifa_id) : null;
+        if (tarifa) {
+          const esAdicional = cleanValues.es_adicional !== undefined
+            ? cleanValues.es_adicional
+            : claseExistente.es_adicional;
+          precio_cobrado = esAdicional ? tarifa.precio_extra : tarifa.precio_regular;
+        }
+      }
+
+      const updatedClase = {
+        ...claseExistente,
+        ...sanitizedPayload,
+        ...(recalc ? { precio_cobrado } : {}),
+        id,
+        user_id: currentUserId,
+      };
+      await localDb.clases.put(updatedClase);
+
+      const grupo = await localDb.grupos.get(updatedClase.grupo_id);
+      const tarifa = grupo?.tarifa_id ? await localDb.tarifas.get(grupo.tarifa_id) : null;
+      const enriched = {
+        ...updatedClase,
+        grupos: grupo ? { ...grupo, tarifas: tarifa || null } : null,
+      };
+
+      clasesCache.clear();
+      setClases((prev) => prev.map((c) => (c.id === id ? enriched : c)));
+      return enriched;
+    }
+
+    // ── Modo online (Supabase) ────────────────────────────────────────────────
+    if (recalc) {
+      const rawGrupoId = String(cleanValues.grupo_id || '').trim();
+      const isPureDigits = /^\d+$/.test(rawGrupoId);
+      const resolvedGrupoId = isPureDigits ? Number(rawGrupoId) : rawGrupoId;
+
+      const { data: grupo, error: gErr } = await supabase
+        .from('grupos')
+        .select('tarifa_id, tarifas(precio_regular, precio_extra)')
+        .eq('id', resolvedGrupoId)
+        .single();
+      if (gErr) throw new Error(gErr.message);
+
+      const tarifa = grupo?.tarifas;
+      if (!tarifa) throw new Error('El grupo no tiene tarifa asociada.');
+
+      const precio_cobrado = cleanValues.es_adicional
+        ? tarifa.precio_extra
+        : tarifa.precio_regular;
+
+      sanitizedPayload.precio_cobrado = precio_cobrado;
+    }
+
     const { data, error: err } = await supabase
       .from('clases')
       .update(sanitizedPayload)
@@ -278,12 +438,19 @@ export function useClases(filtros = {}) {
       .single();
     if (err) throw new Error(err.message);
 
-    clasesCache.clear(); // Limpiar caché tras mutación
+    clasesCache.clear();
     setClases((prev) => prev.map((c) => (c.id === id ? data : c)));
     return data;
   };
 
   const deleteClase = async (id) => {
+    if (isOffline) {
+      await localDb.clases.delete(id);
+      clasesCache.clear();
+      setClases((prev) => prev.filter((c) => c.id !== id));
+      return;
+    }
+
     const { error: err } = await supabase.from('clases').delete().eq('id', id);
     if (err) throw new Error(err.message);
     clasesCache.clear();
