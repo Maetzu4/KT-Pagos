@@ -16,7 +16,7 @@ function Layout({ children }) {
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-sans">
       <Navbar />
       {/* Contenido principal: offset para sidebar en desktop, padding-bottom en mobile */}
-      <main className="md:pl-16 lg:pl-56 pb-20 md:pb-0 transition-all">
+      <main className="md:pl-16 lg:pl-56 pb-24 md:pb-0 transition-all">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-3 pb-8 md:py-8">
           {children}
         </div>

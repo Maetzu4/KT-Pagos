@@ -79,7 +79,7 @@ export function Navbar() {
       <Sidebar />
 
       {/* ── Bottom Navigation Translúcido (Móvil) ── */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/60 dark:bg-zinc-950/60 backdrop-blur-md border-t border-zinc-200 dark:border-zinc-800 py-2 safe-area-inset-bottom">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/60 dark:bg-zinc-950/60 backdrop-blur-md border-t border-zinc-200 dark:border-zinc-800 pt-3 pb-6 safe-area-inset-bottom">
         <div className="relative flex w-full justify-around items-center">
           {/* Fondo animado sliding pill */}
           {activeIdx >= 0 && (
