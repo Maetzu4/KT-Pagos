@@ -5,14 +5,17 @@ import { Table } from '../components/ui/Table';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
+import { Toast } from '../components/ui/Toast';
 import { GrupoDetailModal } from '../components/ui/GrupoDetailModal';
 import { GrupoForm } from '../components/forms/GrupoForm';
 import { GestionarExtrasModal } from '../components/modals/GestionarExtrasModal';
 import { useGrupos } from '../hooks/useGrupos';
+import { useTarifas } from '../hooks/useTarifas';
 
 // ── Vista Principal ────────────────────────────────────────────────────────────
 export default function Grupos() {
   const { grupos, loading, createGrupo, updateGrupo, deleteGrupo } = useGrupos();
+  const { tarifas } = useTarifas();
 
   const [modal,              setModal]              = useState(null);   // null | 'create' | grupo (para editar)
   const [detalle,            setDetalle]            = useState(null);   // grupo para modal de detalle
@@ -20,6 +23,7 @@ export default function Grupos() {
   const [search,             setSearch]             = useState('');
   const [confirmId,          setConfirmId]          = useState(null);
   const [showGestionExtras,  setShowGestionExtras]  = useState(false);
+  const [toastWarning,       setToastWarning]       = useState(null);
 
   const gruposFiltrados = grupos
     .filter((g) => {
@@ -44,7 +48,21 @@ export default function Grupos() {
       return fa.localeCompare(fb);
     });
 
-  const openCreate = () => setModal('create');
+  const openCreate = () => {
+    if (!tarifas || tarifas.length === 0) {
+      setToastWarning('Debes crear al menos una Tarifa en la Configuración antes de crear grupos');
+      return;
+    }
+    setModal('create');
+  };
+
+  const handleOpenGestionExtras = () => {
+    if (!grupos || grupos.length === 0) {
+      setToastWarning('Debes crear un grupo antes de poder añadir clases extra');
+      return;
+    }
+    setShowGestionExtras(true);
+  };
   const openEdit   = (g) => setModal(g);
   const closeModal = () => setModal(null);
 
@@ -169,7 +187,7 @@ export default function Grupos() {
           {/* Gestionar Extras — compacto en móvil (solo icono), texto en desktop */}
           <Button
             variant="secondary"
-            onClick={() => setShowGestionExtras(true)}
+            onClick={handleOpenGestionExtras}
             id="btn-gestionar-extras"
             className="!h-9 px-3 shrink-0 text-xs shadow-sm"
             title="Gestionar Extras"
@@ -241,6 +259,9 @@ export default function Grupos() {
         onCancel={() => setConfirmId(null)}
         destructive
       />
+
+      {/* Toast de advertencia / flujo */}
+      <Toast message={toastWarning} onClose={() => setToastWarning(null)} />
     </div>
   );
 }

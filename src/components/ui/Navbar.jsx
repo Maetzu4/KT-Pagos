@@ -6,18 +6,18 @@ import { cn } from '../../lib/utils';
 import { Sidebar } from './Sidebar';
 
 const NAV_ITEMS = [
-  { to: '/',              icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/finanzas',      icon: BarChart3,        label: 'Finanzas'  },
-  { to: '/bonos',         icon: Trophy,           label: 'Bonos'     },
-  { to: '/grupos',        icon: Users,            label: 'Grupos'    },
-  { to: '/configuracion', icon: Settings,         label: 'Config'    },
+  { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/finanzas', icon: BarChart3, label: 'Finanzas' },
+  { to: '/bonos', icon: Trophy, label: 'Bonos' },
+  { to: '/grupos', icon: Users, label: 'Grupos' },
+  { to: '/configuracion', icon: Settings, label: 'Config' },
 ];
 
 const PAGE_TITLES = {
-  '/':              'Dashboard',
-  '/finanzas':      'Finanzas',
-  '/bonos':         'Bonos',
-  '/grupos':        'Grupos',
+  '/': 'Dashboard',
+  '/finanzas': 'Finanzas',
+  '/bonos': 'Bonos',
+  '/grupos': 'Grupos',
   '/configuracion': 'Configuración',
 };
 
@@ -79,7 +79,7 @@ export function Navbar() {
       <Sidebar />
 
       {/* ── Bottom Navigation Translúcido (Móvil) ── */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/60 dark:bg-zinc-950/60 backdrop-blur-md border-t border-zinc-200 dark:border-zinc-800 pt-3 pb-6 safe-area-inset-bottom">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/60 dark:bg-zinc-950/60 backdrop-blur-md border-t border-zinc-200 dark:border-zinc-800 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
         <div className="relative flex w-full justify-around items-center">
           {/* Fondo animado sliding pill */}
           {activeIdx >= 0 && (

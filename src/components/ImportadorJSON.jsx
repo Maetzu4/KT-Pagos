@@ -2,10 +2,12 @@ import { useState, useEffect } from 'react';
 import { ClipboardPaste, CheckCircle2, AlertCircle, Loader2, Upload, ExternalLink, Code2, ChevronDown, ChevronUp } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../hooks/useAuth';
+import { useTarifas } from '../hooks/useTarifas';
 import { localDb, generateLocalId } from '../lib/localDb';
 import { generarClasesParaGrupo } from '../lib/generadorClases';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
+import { Toast } from './ui/Toast';
 
 const EJEMPLO_JSON = JSON.stringify(
   {
@@ -128,12 +130,14 @@ const STEP = {
 export function ImportadorJSON() {
   const { isOffline, user } = useAuth();
   const currentUserId = user?.id || 'local-user';
+  const { tarifas } = useTarifas();
 
   const [step,        setStep]        = useState(STEP.IDLE);
   const [grupos,      setGrupos]      = useState([]);
   const [mensaje,     setMensaje]     = useState('');
   const [results,     setResults]     = useState({ gruposOk: 0, gruposErr: 0, clasesOk: 0, clasesErr: 0, gruposOmitidos: 0 });
   const [showEjemplo, setShowEjemplo] = useState(false);
+  const [toastWarning, setToastWarning] = useState(null);
 
   /** Permite al usuario editar las lecciones de un grupo antes de guardar. */
   const handleUpdateLecciones = (index, value) => {
@@ -166,6 +170,11 @@ export function ImportadorJSON() {
 
   // ── 1. Leer portapapeles y validar ──────────────────────────────────────
   const handlePegar = async () => {
+    // Guardrail: debe existir al menos una tarifa antes de importar
+    if (!tarifas || tarifas.length === 0) {
+      setToastWarning('Debes crear al menos una Tarifa en Configuración antes de importar grupos');
+      return;
+    }
     setMensaje('');
     try {
       const text = await navigator.clipboard.readText();
@@ -739,6 +748,9 @@ export function ImportadorJSON() {
           </Button>
         </div>
       )}
+
+      {/* Toast de guardrail */}
+      <Toast message={toastWarning} onClose={() => setToastWarning(null)} />
     </div>
   );
 }

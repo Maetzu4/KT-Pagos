@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { Plus, Pencil, Trash2, Check, X } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { ClaseExtraModal } from './ClaseExtraModal';
 import { useClases } from '../../hooks/useClases';
 
@@ -15,6 +16,8 @@ function fmtFecha(str) {
 export function GestionarExtrasModal({ isOpen, onClose }) {
   const { clases, loading, updateClase, deleteClase, refetch } = useClases();
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [deleteError, setDeleteError] = useState(null);
 
   // Filtramos en memoria las clases extras
   const extras = useMemo(() => {
@@ -55,21 +58,25 @@ export function GestionarExtrasModal({ isOpen, onClose }) {
       setEditingId(null);
     } catch (err) {
       console.error('Error al actualizar clase extra:', err);
-      alert('Error al guardar cambios: ' + (err.message || 'Error desconocido'));
+      setDeleteError('Error al guardar cambios: ' + (err.message || 'Error desconocido'));
     } finally {
       setSavingEdit(false);
     }
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('¿Estás seguro de que deseas eliminar esta clase extra?')) {
-      try {
-        await deleteClase(id);
-        await refetch?.();
-      } catch (err) {
-        console.error('Error al eliminar clase extra:', err);
-        alert('Error al eliminar: ' + (err.message || 'Error desconocido'));
-      }
+    setConfirmDeleteId(id);
+  };
+
+  const confirmarDelete = async () => {
+    const id = confirmDeleteId;
+    setConfirmDeleteId(null);
+    try {
+      await deleteClase(id);
+      await refetch?.();
+    } catch (err) {
+      console.error('Error al eliminar clase extra:', err);
+      setDeleteError('Error al eliminar: ' + (err.message || 'Error desconocido'));
     }
   };
 
@@ -77,6 +84,14 @@ export function GestionarExtrasModal({ isOpen, onClose }) {
     <>
       <Modal open={isOpen} onClose={onClose} title="Gestión de Clases Extras" size="lg">
         <div className="space-y-4">
+          {/* Error inline */}
+          {deleteError && (
+            <div className="px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-xs text-red-500">
+              {deleteError}
+              <button className="ml-2 underline" onClick={() => setDeleteError(null)}>Cerrar</button>
+            </div>
+          )}
+
           {/* Cabecera interna con conteo y botón Añadir */}
           <div className="flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800">
             <div>
@@ -247,6 +262,16 @@ export function GestionarExtrasModal({ isOpen, onClose }) {
         isOpen={isAddOpen}
         onClose={() => setIsAddOpen(false)}
         onSuccess={() => refetch?.()}
+      />
+
+      {/* Confirmación de borrado de clase extra */}
+      <ConfirmDialog
+        open={!!confirmDeleteId}
+        title="Eliminar clase extra"
+        message="¿Estás seguro de que deseas eliminar esta clase extra? Esta acción no se puede deshacer."
+        destructive
+        onConfirm={confirmarDelete}
+        onCancel={() => setConfirmDeleteId(null)}
       />
     </>
   );

@@ -8,6 +8,7 @@ import { Table } from '../components/ui/Table';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
+import { Toast } from '../components/ui/Toast';
 import { GrupoDetailModal } from '../components/ui/GrupoDetailModal';
 import { PeriodoModal } from '../components/ui/PeriodoModal';
 import { ClaseExtraModal } from '../components/modals/ClaseExtraModal';
@@ -167,6 +168,15 @@ export default function Dashboard() {
   const [claseAReprogramar,   setClaseAReprogramar]   = useState(null);
   const [showDesglose,        setShowDesglose]        = useState(false);
   const [showResumenClases,   setShowResumenClases]   = useState(false);
+  const [toastWarning,        setToastWarning]        = useState(null);
+
+  const handleOpenAddExtra = () => {
+    if (!grupos || grupos.length === 0) {
+      setToastWarning('Debes crear un grupo antes de poder añadir clases extra');
+      return;
+    }
+    setIsExtraModalOpen(true);
+  };
 
   const handleChartChange = (n) => {
     setChartPeriodos(n);
@@ -193,7 +203,11 @@ export default function Dashboard() {
   const handleCambiarEstado = async (claseId, nuevoEstado) => {
     setUpdatingClase(`${claseId}-${nuevoEstado}`);
     try {
-      await updateClase(claseId, { estado_clase: nuevoEstado });
+      const payload = { estado_clase: nuevoEstado };
+      if (nuevoEstado === 'Transferida') {
+        payload.precio_cobrado = 0;
+      }
+      await updateClase(claseId, payload);
       await handleClassUpdate();
     } catch (err) {
       console.error('Error al actualizar estado de clase:', err);
@@ -459,7 +473,7 @@ export default function Dashboard() {
           </div>
           {/* Botón Añadir Extra — visible en móvil y desktop */}
           <Button
-            onClick={() => setIsExtraModalOpen(true)}
+            onClick={handleOpenAddExtra}
             id="btn-add-clase-extra-dashboard"
             className="h-8 text-xs px-3 shadow-sm"
           >
@@ -517,20 +531,28 @@ export default function Dashboard() {
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-1.5 pt-2 border-t border-zinc-100 dark:border-zinc-800/60">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 pt-2 border-t border-zinc-100 dark:border-zinc-800/60">
                     <button
                       type="button"
                       disabled={!!updatingClase}
                       onClick={() => handleCambiarEstado(c.id, 'Completada')}
-                      className="flex-1 py-1.5 px-2 rounded-lg text-xs font-semibold bg-[var(--accent-color)] text-white shadow-sm hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 text-center"
+                      className="py-1.5 px-2 rounded-lg text-xs font-semibold bg-[var(--accent-color)] text-white shadow-sm hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 text-center"
                     >
                       {updatingClase === `${c.id}-Completada` ? '...' : 'Completada'}
                     </button>
                     <button
                       type="button"
                       disabled={!!updatingClase}
+                      onClick={() => handleCambiarEstado(c.id, 'Transferida')}
+                      className="py-1.5 px-2 rounded-lg text-xs font-medium text-[var(--accent-color)] bg-[var(--accent-color)]/10 hover:bg-[var(--accent-color)]/20 border border-[var(--accent-color)]/20 active:scale-[0.98] transition-all disabled:opacity-50 text-center"
+                    >
+                      {updatingClase === `${c.id}-Transferida` ? '...' : 'Transferida'}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!!updatingClase}
                       onClick={() => handleAplazarClase(c)}
-                      className="flex-1 py-1.5 px-2 rounded-lg text-xs font-medium border border-[var(--accent-color)] text-[var(--accent-color)] bg-transparent hover:bg-[var(--accent-color)]/10 active:scale-[0.98] transition-all disabled:opacity-50 text-center"
+                      className="py-1.5 px-2 rounded-lg text-xs font-medium border border-[var(--accent-color)] text-[var(--accent-color)] bg-transparent hover:bg-[var(--accent-color)]/10 active:scale-[0.98] transition-all disabled:opacity-50 text-center"
                     >
                       {updatingClase === `${c.id}-Aplazada` ? '...' : 'Aplazada'}
                     </button>
@@ -538,9 +560,9 @@ export default function Dashboard() {
                       type="button"
                       disabled={!!updatingClase}
                       onClick={() => handleCambiarEstado(c.id, 'Cancelada')}
-                      className="flex-1 py-1.5 px-2 rounded-lg text-xs font-medium text-[var(--accent-color)] hover:bg-[var(--accent-color)]/10 border border-transparent hover:border-[var(--accent-color)]/20 active:scale-[0.98] transition-all disabled:opacity-50 text-center truncate"
+                      className="py-1.5 px-2 rounded-lg text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 border border-transparent active:scale-[0.98] transition-all disabled:opacity-50 text-center truncate"
                     >
-                      {updatingClase === `${c.id}-Cancelada` ? '...' : 'Cancelada/Sustituida'}
+                      {updatingClase === `${c.id}-Cancelada` ? '...' : 'Cancelada'}
                     </button>
                   </div>
                 </div>
@@ -658,6 +680,9 @@ export default function Dashboard() {
           await handleClassUpdate();
         }}
       />
+
+      {/* ── Toast de advertencia / flujo ── */}
+      <Toast message={toastWarning} onClose={() => setToastWarning(null)} />
       </div>
     </div>
   );

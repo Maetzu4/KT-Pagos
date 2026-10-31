@@ -1,17 +1,23 @@
+import { useState } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { ThemeProvider } from './context/ThemeContext';
 import { Navbar } from './components/ui/Navbar';
+import { OnboardingModal } from './components/ui/OnboardingModal';
 import { useAuth } from './hooks/useAuth';
-import Dashboard     from './pages/Dashboard';
-import Grupos        from './pages/Grupos';
-import Finanzas      from './pages/Finanzas';
-import Bonos         from './pages/Bonos';
+import Dashboard from './pages/Dashboard';
+import Grupos from './pages/Grupos';
+import Finanzas from './pages/Finanzas';
+import Bonos from './pages/Bonos';
 import Configuracion from './pages/Configuracion';
-import Login         from './pages/Login';
-import Registro      from './pages/Registro';
+import Login from './pages/Login';
+import Registro from './pages/Registro';
 import ActualizarPassword from './pages/ActualizarPassword';
 
 function Layout({ children }) {
+  const [showOnboarding, setShowOnboarding] = useState(() => {
+    return !localStorage.getItem('kt_onboarding_v1');
+  });
+
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-sans">
       <Navbar />
@@ -21,6 +27,12 @@ function Layout({ children }) {
           {children}
         </div>
       </main>
+
+      {/* Modal interactivo de bienvenida y tips de inicio */}
+      <OnboardingModal
+        open={showOnboarding}
+        onClose={() => setShowOnboarding(false)}
+      />
     </div>
   );
 }
@@ -57,10 +69,10 @@ export default function App() {
             element={
               <Layout key={layoutKey}>
                 <Routes>
-                  <Route path="/"              element={<Dashboard />} />
-                  <Route path="/grupos"        element={<Grupos />} />
-                  <Route path="/finanzas"      element={<Finanzas />} />
-                  <Route path="/bonos"         element={<Bonos />} />
+                  <Route path="/" element={<Dashboard />} />
+                  <Route path="/grupos" element={<Grupos />} />
+                  <Route path="/finanzas" element={<Finanzas />} />
+                  <Route path="/bonos" element={<Bonos />} />
                   <Route path="/configuracion" element={<Configuracion />} />
                 </Routes>
               </Layout>

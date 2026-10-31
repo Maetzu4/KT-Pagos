@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Plus, Pencil, Trash2, Sun, Moon, LogOut, Heart, Database, Download, Upload, User, HardDrive } from 'lucide-react';
+import { Plus, Pencil, Trash2, Sun, Moon, LogOut, Heart, Database, Download, Upload, User, HardDrive, HelpCircle } from 'lucide-react';
 import { ImportadorJSON } from '../components/ImportadorJSON';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../hooks/useAuth';
@@ -10,7 +10,9 @@ import { Toggle } from '../components/ui/Toggle';
 import { ColorPicker } from '../components/ui/ColorPicker';
 import { FormField, Input } from '../components/ui/FormField';
 import { Modal } from '../components/ui/Modal';
+import { OnboardingModal } from '../components/ui/OnboardingModal';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
+import { Toast } from '../components/ui/Toast';
 import { Table } from '../components/ui/Table';
 import { useTarifas } from '../hooks/useTarifas';
 import { useTheme } from '../context/ThemeContext';
@@ -102,6 +104,7 @@ export default function Configuracion() {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [isDonationModalOpen, setIsDonationModalOpen] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
   const currentUser = user;
 
   // Estados de Respaldo y Zona de Peligro
@@ -111,6 +114,11 @@ export default function Configuracion() {
   const [confirmDeleteText, setConfirmDeleteText] = useState('');
   const [deletingAll, setDeletingAll] = useState(false);
   const fileInputRef = useRef(null);
+
+  // Notificación inline (reemplaza alert())
+  const [notifMsg, setNotifMsg] = useState(null);
+  const [notifType, setNotifType] = useState('success'); // 'success' | 'error'
+  const showNotif = (msg, type = 'success') => { setNotifMsg(msg); setNotifType(type); setTimeout(() => setNotifMsg(null), 4000); };
 
   const handleSubmit = async (values) => {
     if (modal === 'create') await createTarifa(values);
@@ -127,7 +135,7 @@ export default function Configuracion() {
 
   const copiarCorreo = () => {
     navigator.clipboard.writeText('6814natsu@gmail.com');
-    alert('¡Correo copiado al portapapeles!');
+    showNotif('¡Correo copiado al portapapeles!');
   };
 
   // Helper para consultar todas las filas con paginación (evita el límite de 1000 filas de PostgREST)
@@ -213,7 +221,7 @@ export default function Configuracion() {
       URL.revokeObjectURL(url);
     } catch (err) {
       console.error('Error al exportar backup:', err);
-      alert('Error al descargar el backup: ' + (err.message || 'Error desconocido'));
+      showNotif('Error al descargar el backup: ' + (err.message || 'Error desconocido'), 'error');
     } finally {
       setExporting(false);
     }
@@ -592,7 +600,7 @@ export default function Configuracion() {
       window.location.reload();
     } catch (err) {
       console.error('Error al restaurar backup:', err);
-      alert('Error al restaurar el respaldo: ' + (err.message || 'Archivo inválido'));
+      showNotif('Error al restaurar el respaldo: ' + (err.message || 'Archivo inválido'), 'error');
     } finally {
       if (fileInputRef.current) fileInputRef.current.value = '';
       setImportingBackup(false);
@@ -613,6 +621,7 @@ export default function Configuracion() {
           localDb.periodos.clear(),
           localDb.tarifas.clear(),
         ]);
+        localStorage.removeItem('kt_onboarding_v1');
         alert('Todos tus datos locales han sido eliminados correctamente.');
         setShowDangerModal(false);
         setConfirmDeleteText('');
@@ -647,13 +656,14 @@ export default function Configuracion() {
         .eq('user_id', currentUserId);
       if (errTarifas) throw new Error(`Error al eliminar tarifas: ${errTarifas.message}`);
 
+      localStorage.removeItem('kt_onboarding_v1');
       alert('Todos tus datos han sido eliminados correctamente.');
       setShowDangerModal(false);
       setConfirmDeleteText('');
       window.location.reload();
     } catch (err) {
       console.error('Error al borrar todos los datos:', err);
-      alert('Error durante el borrado masivo: ' + (err.message || 'Error desconocido'));
+      showNotif('Error durante el borrado masivo: ' + (err.message || 'Error desconocido'), 'error');
     } finally {
       setDeletingAll(false);
     }
@@ -723,6 +733,30 @@ export default function Configuracion() {
           </div>
         </Card>
       )}
+
+      {/* ── Guía y Tips de Uso ── */}
+      <Card>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-[var(--accent-color)]/10 flex items-center justify-center shrink-0">
+              <HelpCircle size={18} className="text-[var(--accent-color)]" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-zinc-900 dark:text-white">Guía y Tips de Inicio</p>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">Repasa el flujo ideal de trabajo y recomendaciones</p>
+            </div>
+          </div>
+          <Button
+            variant="secondary"
+            onClick={() => setIsOnboardingOpen(true)}
+            id="btn-ver-tips-uso"
+            className="flex items-center justify-center gap-2 text-xs font-semibold shrink-0"
+          >
+            <HelpCircle size={14} className="text-[var(--accent-color)]" />
+            Ver Tips de Uso
+          </Button>
+        </div>
+      </Card>
 
       {/* ── Apariencia ── */}
       <Card>
@@ -1029,6 +1063,19 @@ export default function Configuracion() {
           </div>
         </div>
       </Modal>
+
+      {/* ── Modal de Tips de Uso y Onboarding ── */}
+      <OnboardingModal
+        open={isOnboardingOpen}
+        onClose={() => setIsOnboardingOpen(false)}
+      />
+
+      {/* ── Toast de notificaciones inline ── */}
+      <Toast
+        message={notifMsg}
+        type={notifType}
+        onClose={() => setNotifMsg(null)}
+      />
       </div>
     </div>
   );

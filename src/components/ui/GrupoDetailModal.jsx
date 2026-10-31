@@ -3,6 +3,7 @@ import { Plus, Calendar, Clock, ExternalLink, X, ChevronDown, CheckCircle2, Cale
 import { Modal } from './Modal';
 import { Badge } from './Badge';
 import { Button } from './Button';
+import { ConfirmDialog } from './ConfirmDialog';
 import { ClaseExtraModal } from '../modals/ClaseExtraModal';
 import { ReprogramarClaseModal } from '../modals/ReprogramarClaseModal';
 import { supabase } from '../../lib/supabaseClient';
@@ -100,6 +101,8 @@ export function GrupoDetailModal({ grupo, open, onClose, onEdit, onClassUpdate }
   const [filtroEstado,       setFiltroEstado]       = useState('todas');
   const [isAplazando,        setIsAplazando]        = useState(false);
   const [toastMsg,           setToastMsg]           = useState(null); // { type: 'ok'|'err', text }
+  const [showAplazarConfirm, setShowAplazarConfirm] = useState(false);
+  const [claseParaAplazar,   setClaseParaAplazar]   = useState(null);
 
   // Fetch clases del grupo
   const fetchClases = useCallback(async () => {
@@ -180,8 +183,15 @@ export function GrupoDetailModal({ grupo, open, onClose, onEdit, onClassUpdate }
 
   // ── Aplazo masivo: esta clase y todas las posteriores +7 días ──────────────
   const handleAplazarMasivo = async (clase) => {
-    const ok = window.confirm("¿Seguro que deseas aplazar esta clase y TODAS las programadas posteriormente exactamente 7 días?");
-    if (!ok) return;
+    setClaseParaAplazar(clase);
+    setShowAplazarConfirm(true);
+  };
+
+  const confirmarAplazarMasivo = async () => {
+    const clase = claseParaAplazar;
+    setShowAplazarConfirm(false);
+    setClaseParaAplazar(null);
+    if (!clase) return;
 
     setIsAplazando(true);
     setToastMsg(null);
@@ -474,6 +484,15 @@ export function GrupoDetailModal({ grupo, open, onClose, onEdit, onClassUpdate }
         clase={claseAReprogramar}
         onClose={() => setClaseAReprogramar(null)}
         onConfirm={handleConfirmarReprogramacion}
+      />
+
+      {/* ── Confirmación de aplazo masivo ── */}
+      <ConfirmDialog
+        open={showAplazarConfirm}
+        title="Aplazar clases en lote"
+        message="¿Seguro que deseas aplazar esta clase y TODAS las programadas posteriormente exactamente 7 días?"
+        onConfirm={confirmarAplazarMasivo}
+        onCancel={() => { setShowAplazarConfirm(false); setClaseParaAplazar(null); }}
       />
     </>
   );
