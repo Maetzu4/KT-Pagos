@@ -596,8 +596,10 @@ export default function Configuracion() {
         }
       }
 
-      alert('¡Respaldo restaurado con éxito!');
-      window.location.reload();
+      showNotif('¡Respaldo restaurado con éxito!', 'ok');
+      setTimeout(() => {
+        window.location.reload();
+      }, 2000);
     } catch (err) {
       console.error('Error al restaurar backup:', err);
       showNotif('Error al restaurar el respaldo: ' + (err.message || 'Archivo inválido'), 'error');
@@ -622,10 +624,12 @@ export default function Configuracion() {
           localDb.tarifas.clear(),
         ]);
         localStorage.removeItem('kt_onboarding_v1');
-        alert('Todos tus datos locales han sido eliminados correctamente.');
         setShowDangerModal(false);
         setConfirmDeleteText('');
-        window.location.reload();
+        showNotif('Todos tus datos locales han sido eliminados correctamente.', 'ok');
+        setTimeout(() => {
+          window.location.reload();
+        }, 2000);
         return;
       }
 
@@ -657,10 +661,12 @@ export default function Configuracion() {
       if (errTarifas) throw new Error(`Error al eliminar tarifas: ${errTarifas.message}`);
 
       localStorage.removeItem('kt_onboarding_v1');
-      alert('Todos tus datos han sido eliminados correctamente.');
       setShowDangerModal(false);
       setConfirmDeleteText('');
-      window.location.reload();
+      showNotif('Todos tus datos han sido eliminados correctamente.', 'ok');
+      setTimeout(() => {
+        window.location.reload();
+      }, 2000);
     } catch (err) {
       console.error('Error al borrar todos los datos:', err);
       showNotif('Error durante el borrado masivo: ' + (err.message || 'Error desconocido'), 'error');

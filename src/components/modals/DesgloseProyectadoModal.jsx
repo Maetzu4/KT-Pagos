@@ -38,27 +38,52 @@ function Fila({ icon: Icon, label, value, sub, highlight, badge, muted }) {
 }
 
 export function DesgloseProyectadoModal({ open, onClose, periodo, clases }) {
-  if (!periodo) return null;
+  // ── 1. Hooks incondicionales al inicio ─────────────────────────────────────
+  const listaClases = useMemo(() => {
+    return (clases && clases.length > 0) ? clases : (periodo?.clases || []);
+  }, [clases, periodo?.clases]);
 
-  // Clases válidas (excluyendo canceladas)
-  const listaClases = (clases && clases.length > 0) ? clases : (periodo?.clases || []);
   const validClases = useMemo(
     () => (listaClases || []).filter((c) => c?.estado_clase !== 'Cancelada'),
     [listaClases]
   );
 
-  // Clases regulares y extras
-  const clasesRegulares = useMemo(() => validClases.filter((c) => !c?.es_adicional), [validClases]);
-  const clasesExtras    = useMemo(() => validClases.filter((c) => c?.es_adicional), [validClases]);
+  const clasesRegulares = useMemo(() => (validClases || []).filter((c) => !c?.es_adicional), [validClases]);
+  const clasesExtras    = useMemo(() => (validClases || []).filter((c) => c?.es_adicional), [validClases]);
 
-  // Conteos
+  const completadas = useMemo(
+    () => (validClases || []).filter((c) => c?.estado_clase === 'Completada'),
+    [validClases]
+  );
+
+  const multiplicador = Number(periodo?.multiplicador_bono ?? 0);
+
+  const { totalGanado, cantCompletadas } = useMemo(() => {
+    if (validClases && validClases.length > 0) {
+      const compReg = (completadas || []).filter((c) => !c?.es_adicional);
+      const compExt = (completadas || []).filter((c) => c?.es_adicional);
+      const ganadoReg = compReg.reduce((s, c) => s + getPrecioClase(c), 0);
+      const ganadoExt = compExt.reduce((s, c) => s + getPrecioClase(c), 0);
+      const ganadoBono = ganadoReg * multiplicador;
+      return {
+        totalGanado: ganadoReg + ganadoExt + ganadoBono,
+        cantCompletadas: (completadas || []).length,
+      };
+    }
+    return {
+      totalGanado: Number(periodo?.ingreso_real ?? periodo?.estimado_real ?? 0),
+      cantCompletadas: (periodo?.clases || []).filter((c) => c?.estado_clase === 'Completada').length || 0,
+    };
+  }, [validClases, completadas, multiplicador, periodo]);
+
+  // Conteos seguros
   const cantRegulares = clasesRegulares.length > 0
     ? clasesRegulares.length
-    : (periodo?.clases?.filter((c) => !c?.es_adicional && c?.estado_clase !== 'Cancelada').length || 0);
+    : (periodo?.clases || []).filter((c) => !c?.es_adicional && c?.estado_clase !== 'Cancelada').length || 0;
 
   const cantExtras = clasesExtras.length > 0
     ? clasesExtras.length
-    : (periodo?.clases?.filter((c) => c?.es_adicional && c?.estado_clase !== 'Cancelada').length || 0);
+    : (periodo?.clases || []).filter((c) => c?.es_adicional && c?.estado_clase !== 'Cancelada').length || 0;
 
   // Montos base proyectados
   const montoRegulares = clasesRegulares.length > 0
@@ -69,47 +94,34 @@ export function DesgloseProyectadoModal({ open, onClose, periodo, clases }) {
     ? clasesExtras.reduce((s, c) => s + getPrecioClase(c), 0)
     : Number(periodo?.ingresos_extras ?? 0);
 
-  // Multiplicador y monto de bono
-  const multiplicador = Number(periodo?.multiplicador_bono ?? 0);
   const pctBono = Math.round(multiplicador * 100);
   const montoBono = montoRegulares * multiplicador;
-
-  // Deuda anterior (arrastre)
   const deudaAnterior = Number(periodo?.deuda_anterior ?? 0);
-
-  // Proyectado Total del Mes (INCLUYE Bono)
   const totalProyectado = montoRegulares + montoExtras + montoBono + (deudaAnterior > 0 ? deudaAnterior : 0);
-
-  // Total Ganado a la fecha (solo clases en estado 'Completada')
-  const completadas = useMemo(
-    () => validClases.filter((c) => c?.estado_clase === 'Completada'),
-    [validClases]
-  );
-
-  const { totalGanado, cantCompletadas } = useMemo(() => {
-    if (validClases.length > 0) {
-      const compReg = completadas.filter((c) => !c?.es_adicional);
-      const compExt = completadas.filter((c) => c?.es_adicional);
-      const ganadoReg = compReg.reduce((s, c) => s + getPrecioClase(c), 0);
-      const ganadoExt = compExt.reduce((s, c) => s + getPrecioClase(c), 0);
-      const ganadoBono = ganadoReg * multiplicador;
-      return {
-        totalGanado: ganadoReg + ganadoExt + ganadoBono,
-        cantCompletadas: completadas.length,
-      };
-    }
-    return {
-      totalGanado: Number(periodo?.estimado_real ?? 0),
-      cantCompletadas: periodo?.clases?.filter((c) => c?.estado_clase === 'Completada').length || 0,
-    };
-  }, [validClases, completadas, multiplicador, periodo]);
-
   const pctAvance = totalProyectado > 0 ? Math.min(Math.round((totalGanado / totalProyectado) * 100), 100) : 0;
+
+  // ── 2. Rendereo condicional después de todos los hooks ────────────────────
+  if (!open) return null;
+
+  if (!periodo && (!listaClases || listaClases.length === 0)) {
+    return (
+      <Modal open={open} onClose={onClose} title="Desglose Proyectado">
+        <div className="py-12 px-4 text-center">
+          <p className="text-base font-semibold text-zinc-900 dark:text-white">
+            Aún no hay clases registradas para este periodo.
+          </p>
+          <p className="text-xs sm:text-sm text-zinc-500 mt-1">
+            Completa o añade clases para generar tu reporte financiero.
+          </p>
+        </div>
+      </Modal>
+    );
+  }
 
   return (
     <Modal open={open} onClose={onClose} title="Desglose Proyectado">
       <div className="space-y-4">
-        {/* ── Arriba: Proyectado Total del Mes (diseño sobrio de bloque sin bordes) ── */}
+        {/* ── Arriba: Proyectado Total del Mes ── */}
         <div className="rounded-2xl bg-zinc-50 dark:bg-zinc-800/40 p-4 sm:p-5 flex items-center justify-between">
           <div>
             <div className="flex items-center gap-2">
@@ -167,7 +179,7 @@ export function DesgloseProyectadoModal({ open, onClose, periodo, clases }) {
           )}
         </div>
 
-        {/* ── Abajo: Total Ganado a la fecha (bloque de acento sin bordes) ── */}
+        {/* ── Abajo: Total Ganado a la fecha ── */}
         <div className="rounded-2xl bg-[var(--accent-color)]/10 p-4 space-y-2.5">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2.5 min-w-0">
@@ -207,11 +219,12 @@ export function DesgloseProyectadoModal({ open, onClose, periodo, clases }) {
         </div>
 
         {/* Nota al pie */}
-        <p className="text-xs text-zinc-400 dark:text-zinc-500 text-center px-2">
-          {periodo.nombre_periodo} · Los montos excluyen clases Canceladas
-        </p>
+        {periodo?.nombre_periodo && (
+          <p className="text-xs text-zinc-400 dark:text-zinc-500 text-center px-2">
+            {periodo.nombre_periodo} · Los montos excluyen clases Canceladas
+          </p>
+        )}
       </div>
     </Modal>
   );
 }
-

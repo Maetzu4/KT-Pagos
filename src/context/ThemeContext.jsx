@@ -32,6 +32,13 @@ function applyTheme(mode, accentKey) {
   root.style.setProperty('--accent-dark', accent.dark);
 }
 
+// Inyectar clase dark y estilos de acento desde el primer instante
+try {
+  const initialMode = localStorage.getItem('kt-mode') || 'dark';
+  const initialAccent = localStorage.getItem('kt-accent') || 'blue';
+  applyTheme(initialMode, initialAccent === 'mint' ? 'emerald' : initialAccent);
+} catch (_) {}
+
 export function ThemeProvider({ children }) {
   const [mode, setMode] = useState(() => localStorage.getItem('kt-mode') || 'dark');
   const [accentKey, setAccentKey] = useState(() => {

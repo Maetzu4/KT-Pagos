@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import {
   AlertTriangle, TrendingUp,
   CheckCircle2, RotateCcw, DollarSign,
-  ChevronRight, Sparkles,
+  ChevronRight, Sparkles, CalendarX,
 } from 'lucide-react';
 import { MetricCard } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -27,10 +27,10 @@ function PeriodoCompactCard({ periodo, onClick }) {
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
           <h3 className="font-semibold text-zinc-900 dark:text-white group-hover:text-[var(--accent-color)] transition-colors truncate">
-            {periodo.nombre_periodo}
+            {periodo?.nombre_periodo ?? 'Periodo'}
           </h3>
           <p className="text-[11px] text-zinc-500 mt-0.5 truncate">
-            {formatDate(periodo.fecha_inicio)} — {formatDate(periodo.fecha_fin)}
+            {formatDate(periodo?.fecha_inicio)} — {formatDate(periodo?.fecha_fin)}
           </p>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
@@ -52,17 +52,17 @@ function PeriodoCompactCard({ periodo, onClick }) {
 
 // ── Vista Principal de Finanzas ───────────────────────────────────────────────
 export default function Finanzas() {
+  // ── 1. Hooks de estado y contexto ──────────────────────────────────────────
   const { periodos, loading, updatePeriodo, metricas, periodoActual } = usePeriodos();
-
   const [selectedPeriodo, setSelectedPeriodo] = useState(null);
 
-  // ── Opciones de filtro de Año (estrictamente años numéricos válidos) ───────
+  // ── 2. Opciones de filtro de Año ───────────────────────────────────────────
   const aniosDisponibles = useMemo(() => {
     const set = new Set();
     const currentYear = String(new Date().getFullYear());
     set.add(currentYear);
-    periodos.forEach((p) => {
-      const anio = p.fecha_inicio?.slice(0, 4) || p.key_periodo?.slice(0, 4);
+    (periodos || []).forEach((p) => {
+      const anio = p?.fecha_inicio?.slice(0, 4) || p?.key_periodo?.slice(0, 4);
       if (anio && /^\d{4}$/.test(anio)) set.add(anio);
     });
     const sorted = [...set].sort((a, b) => b.localeCompare(a));
@@ -85,60 +85,107 @@ export default function Finanzas() {
     }
   }, [periodoActual, aniosDisponibles, filtroAnio, anioDefault]);
 
-  // Totales globales animados (Total Estimado, Total Pagado, Total Arrastrado)
-  const animEstimado = useCountUp(loading ? 0 : (metricas?.totalEstimado ?? 0));
-  const animPagado = useCountUp(loading ? 0 : (metricas?.totalCobrado ?? metricas?.totalPagado ?? 0));
-  const animRollover = useCountUp(loading ? 0 : (metricas?.totalRollover ?? 0));
-
-  // ── Filtrado por Año ───────────────────────────────────────────────────────
+  // ── 3. Filtrado por Año ────────────────────────────────────────────────────
   const periodosFiltrados = useMemo(() => {
     const anio = filtroAnio || anioDefault;
-    return periodos.filter((p) => {
+    return (periodos || []).filter((p) => {
       return (
-        p.fecha_inicio?.startsWith(anio) ||
-        p.key_periodo?.startsWith(anio)
+        p?.fecha_inicio?.startsWith(anio) ||
+        p?.key_periodo?.startsWith(anio)
       );
     });
   }, [periodos, filtroAnio, anioDefault]);
 
-  // Derivar Periodo Hero (seleccionado o actual) y los demás periodos para el Grid
-  const periodoHero = useMemo(() => {
-    if (periodosFiltrados.length === 0) return null;
-    const match = periodosFiltrados.find((p) => p.key_periodo === periodoActual?.key_periodo);
-    return match || periodosFiltrados[0];
+  // ── 4. Derivar Periodo Seleccionado / Hero con encadenamiento opcional ──────
+  const periodoSeleccionado = useMemo(() => {
+    if (!periodosFiltrados || periodosFiltrados.length === 0) return null;
+    const match = periodosFiltrados.find((p) => p?.key_periodo === periodoActual?.key_periodo);
+    return match || periodosFiltrados[0] || null;
   }, [periodosFiltrados, periodoActual]);
 
   const periodosGrid = useMemo(() => {
-    if (!periodoHero) return [];
-    return periodosFiltrados.filter((p) => p.key_periodo !== periodoHero.key_periodo);
-  }, [periodosFiltrados, periodoHero]);
+    if (!periodoSeleccionado) return [];
+    return (periodosFiltrados || []).filter((p) => p?.key_periodo !== periodoSeleccionado?.key_periodo);
+  }, [periodosFiltrados, periodoSeleccionado]);
 
-  // Valores numéricos del Hero para useCountUp
-  const heroTotalACobrar = Number(periodoHero ? (periodoHero.total_a_cobrar ?? periodoHero.estimado_real ?? 0) : 0);
-  const heroPagadoReal = Number(periodoHero?.pagado_real ?? 0);
+  // ── 5. Valores numéricos seguros con ?. para animaciones ───────────────────
+  const heroTotalACobrar = Number(periodoSeleccionado?.total_a_cobrar ?? periodoSeleccionado?.estimado_real ?? 0);
+  const heroPagadoReal = Number(periodoSeleccionado?.pagado_real ?? 0);
   const heroDiferencia = heroPagadoReal - heroTotalACobrar;
-  const heroClases = Number(periodoHero?.clases?.length ?? 0);
-  const heroMontoBono = Number(periodoHero?.monto_bono ?? 0);
-  const heroDeudaAnterior = Number(periodoHero?.deuda_anterior ?? 0);
+  const heroClases = Number(periodoSeleccionado?.clases?.length ?? 0);
+  const heroMontoBono = Number(periodoSeleccionado?.monto_bono ?? 0);
+  const heroDeudaAnterior = Number(periodoSeleccionado?.deuda_anterior ?? 0);
 
-  // Animaciones useCountUp del Hero
-  const animHeroTotal = useCountUp(loading ? 0 : heroTotalACobrar);
-  const animHeroPagado = useCountUp(loading ? 0 : heroPagadoReal);
-  const animHeroDiferencia = useCountUp(loading ? 0 : heroDiferencia);
-  const animHeroClases = useCountUp(loading ? 0 : heroClases);
-  const animHeroBono = useCountUp(loading ? 0 : heroMontoBono);
-  const animHeroDeuda = useCountUp(loading ? 0 : heroDeudaAnterior);
+  // ── 6. Todos los Hooks useCountUp incondicionales al nivel superior ────────
+  const animEstimado = useCountUp(loading ? 0 : (metricas?.totalEstimado ?? 0));
+  const animPagado = useCountUp(loading ? 0 : (metricas?.totalCobrado ?? metricas?.totalPagado ?? 0));
+  const animRollover = useCountUp(loading ? 0 : (metricas?.totalRollover ?? 0));
+
+  const animHeroTotal = useCountUp(loading || !periodoSeleccionado ? 0 : heroTotalACobrar);
+  const animHeroPagado = useCountUp(loading || !periodoSeleccionado ? 0 : heroPagadoReal);
+  const animHeroDiferencia = useCountUp(loading || !periodoSeleccionado ? 0 : heroDiferencia);
+  const animHeroClases = useCountUp(loading || !periodoSeleccionado ? 0 : heroClases);
+  const animHeroBono = useCountUp(loading || !periodoSeleccionado ? 0 : heroMontoBono);
+  const animHeroDeuda = useCountUp(loading || !periodoSeleccionado ? 0 : heroDeudaAnterior);
+
+  // ── 7. Verificación de datos / clases para empty state ─────────────────────
+  const tieneDatos = useMemo(() => {
+    if (loading) return true;
+    if (!periodos || periodos.length === 0) return false;
+    if (!periodosFiltrados || periodosFiltrados.length === 0) return false;
+    return periodosFiltrados.some((p) => {
+      const hasClases = Array.isArray(p?.clases) && p.clases.length > 0;
+      const hasPagado = Number(p?.pagado_real || 0) > 0;
+      const hasCobrar = Number(p?.total_a_cobrar || p?.estimado_real || 0) > 0;
+      return hasClases || hasPagado || hasCobrar;
+    });
+  }, [loading, periodos, periodosFiltrados]);
+
+  // ── 8. COMPROBACIÓN TEMPRANA (EMPTY STATE) DESPUÉS DE TODOS LOS HOOKS ──────
+  if (!loading && !periodoSeleccionado) {
+    return (
+      <div className="space-y-6 md:space-y-8 animate-fade-in">
+        <div className="flex flex-row justify-between items-start gap-4">
+          <div className="hidden md:block">
+            <h1 className="text-2xl font-semibold text-zinc-900 dark:text-white">Finanzas</h1>
+            <p className="text-sm text-zinc-500 mt-0.5">Cortes mensuales y seguimiento de pagos</p>
+          </div>
+          <div className="w-full md:w-auto shrink-0">
+            <CustomSelect
+              value={filtroAnio}
+              onChange={setFiltroAnio}
+              options={aniosDisponibles}
+              placeholder="Año"
+              className="w-full md:w-36 bg-zinc-100 dark:bg-zinc-800/50 border-0 rounded-xl font-medium focus:ring-2 focus:ring-[var(--accent-color)] text-xs sm:text-sm"
+            />
+          </div>
+        </div>
+
+        <div className="flex flex-col items-center justify-center text-center py-12 px-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-200/60 dark:border-zinc-800/60">
+          <div className="w-12 h-12 rounded-2xl bg-[var(--accent-color)]/10 text-[var(--accent-color)] flex items-center justify-center mb-3">
+            <CalendarX size={24} />
+          </div>
+          <p className="text-base font-semibold text-zinc-900 dark:text-white">
+            Aún no hay clases registradas para este periodo.
+          </p>
+          <p className="text-xs sm:text-sm text-zinc-500 mt-1 max-w-sm">
+            Completa o añade clases para generar tu reporte financiero.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 md:space-y-8 animate-fade-in">
-      {/* ── Cabecera con Único Selector de Año en la misma fila horizontal ── */}
+      {/* ── Cabecera con Selector de Año ── */}
       <div className="flex flex-row justify-between items-start gap-4">
         <div className="hidden md:block">
           <h1 className="text-2xl font-semibold text-zinc-900 dark:text-white">Finanzas</h1>
           <p className="text-sm text-zinc-500 mt-0.5">Cortes mensuales y seguimiento de pagos</p>
         </div>
 
-        {/* Único Selector: Año */}
+        {/* Selector de Año */}
         <div className="w-full md:w-auto shrink-0">
           <CustomSelect
             value={filtroAnio}
@@ -150,27 +197,41 @@ export default function Finanzas() {
         </div>
       </div>
 
-      {/* ── Totales Globales Reestructurados (3 KPIs) ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <MetricCard
-          label="Total Estimado"
-          value={formatCurrency(animEstimado)}
-          icon={TrendingUp}
-          className="bg-zinc-50 dark:bg-zinc-800/40 border-0 rounded-2xl"
-        />
-        <MetricCard
-          label="Total Pagado"
-          value={<span className="text-[var(--accent-color)]">{formatCurrency(animPagado)}</span>}
-          icon={DollarSign}
-          className="bg-zinc-50 dark:bg-zinc-800/40 border-0 rounded-2xl"
-        />
-        <MetricCard
-          label="Total Arrastrado"
-          value={formatCurrency(animRollover)}
-          icon={RotateCcw}
-          className="bg-zinc-50 dark:bg-zinc-800/40 border-0 rounded-2xl"
-        />
-      </div>
+      {/* ── Totales Globales Reestructurados (3 KPIs) o Empty State ── */}
+      {!tieneDatos ? (
+        <div className="flex flex-col items-center justify-center text-center py-12 px-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-200/60 dark:border-zinc-800/60">
+          <div className="w-12 h-12 rounded-2xl bg-[var(--accent-color)]/10 text-[var(--accent-color)] flex items-center justify-center mb-3">
+            <CalendarX size={24} />
+          </div>
+          <p className="text-base font-semibold text-zinc-900 dark:text-white">
+            Aún no hay clases registradas para este periodo.
+          </p>
+          <p className="text-xs sm:text-sm text-zinc-500 mt-1 max-w-sm">
+            Completa o añade clases para generar tu reporte financiero.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <MetricCard
+            label="Total Estimado"
+            value={formatCurrency(animEstimado)}
+            icon={TrendingUp}
+            className="bg-zinc-50 dark:bg-zinc-800/40 border-0 rounded-2xl"
+          />
+          <MetricCard
+            label="Total Pagado"
+            value={<span className="text-[var(--accent-color)]">{formatCurrency(animPagado)}</span>}
+            icon={DollarSign}
+            className="bg-zinc-50 dark:bg-zinc-800/40 border-0 rounded-2xl"
+          />
+          <MetricCard
+            label="Total Arrastrado"
+            value={formatCurrency(animRollover)}
+            icon={RotateCcw}
+            className="bg-zinc-50 dark:bg-zinc-800/40 border-0 rounded-2xl"
+          />
+        </div>
+      )}
 
       {/* ── Contenido Principal (Hero + Grid) ── */}
       {loading ? (
@@ -178,29 +239,24 @@ export default function Finanzas() {
           <div className="w-8 h-8 border-4 border-[var(--accent-color)] border-t-transparent rounded-full animate-spin" />
           <p className="text-sm text-zinc-500">Cargando registros financieros...</p>
         </div>
-      ) : periodosFiltrados.length === 0 ? (
-        <div className="text-center py-20 bg-zinc-50 dark:bg-zinc-800/20 rounded-2xl p-6 text-zinc-500">
-          <p className="font-medium text-zinc-700 dark:text-zinc-300">No hay periodos registrados para este año.</p>
-          <p className="text-xs mt-1">Los periodos se generan automáticamente al programar o completar clases.</p>
-        </div>
-      ) : (
+      ) : !tieneDatos ? null : (
         <div className="space-y-8">
           {/* ── Hero del Periodo Seleccionado / Actual ── */}
-          {periodoHero && (
+          {periodoSeleccionado && (
             <div className="rounded-2xl bg-zinc-50 dark:bg-zinc-800/40 p-6 sm:p-7 space-y-6">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex flex-wrap items-center gap-3">
                   <h2 className="text-xl sm:text-2xl font-bold text-zinc-900 dark:text-white">
-                    {periodoHero.nombre_periodo}
+                    {periodoSeleccionado?.nombre_periodo ?? 'Periodo'}
                   </h2>
-                  {periodoHero.key_periodo === periodoActual?.key_periodo && (
+                  {periodoSeleccionado?.key_periodo === periodoActual?.key_periodo && (
                     <span className="px-2.5 py-0.5 rounded-md bg-[var(--accent-color)]/10 text-[var(--accent-color)] text-[10px] font-bold uppercase tracking-wider">
                       Periodo Actual
                     </span>
                   )}
                   <Button
                     size="sm"
-                    onClick={() => setSelectedPeriodo(periodoHero)}
+                    onClick={() => setSelectedPeriodo(periodoSeleccionado)}
                     className="text-xs rounded-xl"
                   >
                     Ver detalles del corte
@@ -208,7 +264,7 @@ export default function Finanzas() {
                 </div>
 
                 <span className="text-xs text-zinc-500">
-                  {formatDate(periodoHero.fecha_inicio)} — {formatDate(periodoHero.fecha_fin)}
+                  {formatDate(periodoSeleccionado?.fecha_inicio)} — {formatDate(periodoSeleccionado?.fecha_fin)}
                 </span>
               </div>
 
@@ -247,7 +303,7 @@ export default function Finanzas() {
                   <p className="text-base sm:text-lg font-semibold font-mono text-zinc-900 dark:text-white">
                     {Math.round(animHeroClases)}
                     <span className="text-xs font-normal text-zinc-400 ml-1.5 font-sans">
-                      ({periodoHero.clases?.filter(c => !c.es_adicional).length || 0} reg · {periodoHero.clases?.filter(c => c.es_adicional).length || 0} ext)
+                      ({periodoSeleccionado?.clases?.filter(c => !c?.es_adicional).length || 0} reg · {periodoSeleccionado?.clases?.filter(c => c?.es_adicional).length || 0} ext)
                     </span>
                   </p>
                 </div>
@@ -256,9 +312,9 @@ export default function Finanzas() {
                   <p className="text-xs text-zinc-500 mb-1">Bono Aplicado</p>
                   <p className="text-base sm:text-lg font-semibold font-mono text-zinc-900 dark:text-white">
                     {formatCurrency(animHeroBono)}
-                    {periodoHero.multiplicador_bono > 0 && (
+                    {(periodoSeleccionado?.multiplicador_bono ?? 0) > 0 && (
                       <span className="text-xs text-[var(--accent-color)] font-sans ml-1 font-bold">
-                        (+{(periodoHero.multiplicador_bono * 100).toFixed(0)}%)
+                        (+{((periodoSeleccionado?.multiplicador_bono ?? 0) * 100).toFixed(0)}%)
                       </span>
                     )}
                   </p>
@@ -267,8 +323,8 @@ export default function Finanzas() {
                 <div className="rounded-xl bg-white/70 dark:bg-zinc-900/50 p-3.5 text-left">
                   <p className="text-xs text-zinc-500 mb-1">Deuda Arrastrada</p>
                   <p className="text-base sm:text-lg font-semibold font-mono text-zinc-900 dark:text-white">
-                    {periodoHero.deuda_anterior > 0 ? (
-                      <span className={periodoHero.deuda_resuelta ? 'line-through opacity-60 text-zinc-400' : 'text-[var(--accent-color)]'}>
+                    {(periodoSeleccionado?.deuda_anterior ?? 0) > 0 ? (
+                      <span className={periodoSeleccionado?.deuda_resuelta ? 'line-through opacity-60 text-zinc-400' : 'text-[var(--accent-color)]'}>
                         {formatCurrency(animHeroDeuda)}
                       </span>
                     ) : (
@@ -280,7 +336,7 @@ export default function Finanzas() {
                 <div className="rounded-xl bg-white/70 dark:bg-zinc-900/50 p-3.5 text-left">
                   <p className="text-xs text-zinc-500 mb-1">Estado de Pago</p>
                   <div className="flex items-center gap-1.5 mt-0.5">
-                    {(periodoHero.pagado_real || 0) >= (periodoHero.total_a_cobrar ?? periodoHero.estimado_real) ? (
+                    {(periodoSeleccionado?.pagado_real || 0) >= (periodoSeleccionado?.total_a_cobrar ?? periodoSeleccionado?.estimado_real ?? 0) ? (
                       <>
                         <CheckCircle2 size={16} className="text-emerald-500" />
                         <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">Cubierto</span>
@@ -310,7 +366,7 @@ export default function Finanzas() {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {periodosGrid.map((p) => (
                   <PeriodoCompactCard
-                    key={p.key_periodo}
+                    key={p?.key_periodo ?? p?.id}
                     periodo={p}
                     onClick={() => setSelectedPeriodo(p)}
                   />

@@ -21,6 +21,7 @@ import { useClases } from '../hooks/useClases';
 import { useCountUp } from '../hooks/useCountUp';
 import { formatCurrency } from '../lib/utils';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
+import { nombrePeriodo } from '../lib/dateUtils';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -178,6 +179,15 @@ export default function Dashboard() {
     setIsExtraModalOpen(true);
   };
 
+  const handleOpenDesglose = (e) => {
+    e?.preventDefault?.();
+    if (sinActividadMes || !periodoActual || clasesFiltradas.length === 0) {
+      setToastWarning('Aún no hay clases registradas para mostrar un desglose.');
+      return;
+    }
+    setShowDesglose(true);
+  };
+
   const handleChartChange = (n) => {
     setChartPeriodos(n);
     localStorage.setItem('chartPeriodos', n);
@@ -259,13 +269,14 @@ export default function Dashboard() {
 
     // Total Ganado a la fecha (solo completadas + bono de clases regulares completadas)
     const ganadoRegulares = completadasArr
-      .filter((c) => !c.es_adicional)
+      .filter((c) => !c?.es_adicional)
       .reduce((s, c) => Number(s) + Number(getPrecio(c)), 0);
     const ganadoExtras = completadasArr
-      .filter((c) => c.es_adicional)
+      .filter((c) => c?.es_adicional)
       .reduce((s, c) => Number(s) + Number(getPrecio(c)), 0);
     const ganadoBono = ganadoRegulares * multiplicador;
-    const ganado = ganadoRegulares + ganadoExtras + ganadoBono;
+    const ganadoCalculado = ganadoRegulares + ganadoExtras + ganadoBono;
+    const ganado = ganadoCalculado > 0 ? ganadoCalculado : Number(periodoActual?.ingreso_real ?? 0);
 
     return { proyectado, ganado, totalMes, completadas: completadasArr.length };
   }, [clasesFiltradas, periodoActual]);
@@ -276,6 +287,9 @@ export default function Dashboard() {
   const animMesAnterior   = useCountUp(loadingPeriodos ? 0 : (periodoAnterior?.pagado_real ?? 0));
   const animCompletadas   = useCountUp(loadingClases ? 0 : completadas);
   const animGruposActivos = useCountUp(loadingGrupos ? 0 : gruposActivos.length);
+
+  const nombreMes = periodoActual?.nombre_periodo || nombrePeriodo(new Date());
+  const sinActividadMes = !loadingClases && (totalMes === 0 || !periodoActual);
 
   // ── Progreso por grupo (clases completadas en el periodo actual) ───────────
   const progresoByGrupo = useMemo(() => {
@@ -290,13 +304,13 @@ export default function Dashboard() {
 
   // ── Datos para la gráfica ────────────────────────────────────────────────
   const chartData = useMemo(() =>
-    [...periodos]
-      .sort((a, b) => a.fecha_inicio?.localeCompare(b.fecha_inicio))
+    [...(periodos || [])]
+      .sort((a, b) => (a?.fecha_inicio ?? '').localeCompare(b?.fecha_inicio ?? ''))
       .slice(-chartPeriodos)
       .map((p) => ({
-        name:      p.nombre_periodo?.split(' ')[0] ?? p.nombre_periodo,
-        Estimado:  Number(p.total_a_cobrar ?? p.estimado_real ?? 0),
-        Cobrado:   Number(p.pagado_real ?? 0),
+        name:      p?.nombre_periodo ? p.nombre_periodo.split(' ')[0] : (p?.key_periodo ?? '—'),
+        Estimado:  Number(p?.total_a_cobrar ?? p?.estimado_real ?? 0),
+        Cobrado:   Number(p?.pagado_real ?? 0),
       })),
     [periodos, chartPeriodos]
   );
@@ -368,9 +382,7 @@ export default function Dashboard() {
       <div className="hidden md:block mb-8">
         <h1 className="text-2xl font-semibold text-zinc-900 dark:text-white">Dashboard</h1>
         <p className="text-sm text-zinc-500 mt-1">
-          {periodoActual?.nombre_periodo
-            ? `Resumen de ${periodoActual.nombre_periodo}`
-            : 'Resumen financiero de tutorías'}
+          Resumen de {nombreMes}
         </p>
       </div>
 
@@ -381,18 +393,16 @@ export default function Dashboard() {
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-white/20 text-white backdrop-blur-sm">
             <TrendingUp size={13} /> Proyectado del Mes
           </span>
-          {periodoActual?.nombre_periodo && (
-            <span className="text-xs text-white/80 font-medium">
-              · {periodoActual.nombre_periodo}
-            </span>
-          )}
+          <span className="text-xs text-white/80 font-medium">
+            · {nombreMes}
+          </span>
         </div>
         <div className="text-3xl sm:text-5xl font-bold tracking-tight text-white font-mono mt-1">
           {formatCurrency(animProyectado)}
         </div>
         <button
           type="button"
-          onClick={() => setShowDesglose(true)}
+          onClick={handleOpenDesglose}
           className="mt-3 inline-flex items-center gap-1.5 text-xs text-white/70 hover:text-white transition-colors group cursor-pointer"
         >
           <Info size={12} className="group-hover:scale-110 transition-transform" />
@@ -408,7 +418,7 @@ export default function Dashboard() {
           value={formatCurrency(animGanado)}
           sub="Solo clases completadas"
           icon={DollarSign}
-          onClick={() => setShowDesglose(true)}
+          onClick={handleOpenDesglose}
         />
 
         {/* Mes Anterior */}
@@ -531,7 +541,7 @@ export default function Dashboard() {
                     </p>
                   </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 pt-2 border-t border-zinc-100 dark:border-zinc-800/60">
+                  <div className="grid grid-cols-2 gap-2 mt-3 w-full">
                     <button
                       type="button"
                       disabled={!!updatingClase}
@@ -544,7 +554,7 @@ export default function Dashboard() {
                       type="button"
                       disabled={!!updatingClase}
                       onClick={() => handleCambiarEstado(c.id, 'Transferida')}
-                      className="py-1.5 px-2 rounded-lg text-xs font-medium text-[var(--accent-color)] bg-[var(--accent-color)]/10 hover:bg-[var(--accent-color)]/20 border border-[var(--accent-color)]/20 active:scale-[0.98] transition-all disabled:opacity-50 text-center"
+                      className="py-1.5 px-2 rounded-lg text-xs font-medium text-[var(--accent-color)] bg-[var(--accent-color)]/10 dark:bg-[var(--accent-color)]/20 border border-transparent hover:bg-[var(--accent-color)]/20 dark:hover:bg-[var(--accent-color)]/30 active:scale-[0.98] transition-all disabled:opacity-50 text-center"
                     >
                       {updatingClase === `${c.id}-Transferida` ? '...' : 'Transferida'}
                     </button>
@@ -682,7 +692,7 @@ export default function Dashboard() {
       />
 
       {/* ── Toast de advertencia / flujo ── */}
-      <Toast message={toastWarning} onClose={() => setToastWarning(null)} />
+      <Toast message={toastWarning} onClose={() => setToastWarning(null)} type="warning" />
       </div>
     </div>
   );
