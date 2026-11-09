@@ -151,7 +151,11 @@ export function GestionarExtrasModal({ isOpen, onClose }) {
                   <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
                     {extras.map((c) => {
                       const isEditing = editingId === c.id;
-                      const nombreGrupo = c.grupos?.nombre_grupo ?? '—';
+                      const esExterna = Boolean(c.es_externa);
+                      // For external extras show descripcion_externa instead of group name
+                      const nombreGrupo = esExterna
+                        ? (c.descripcion_externa || 'Clase Externa')
+                        : (c.grupos?.nombre_grupo ?? '—');
 
                       return (
                         <tr
@@ -172,9 +176,16 @@ export function GestionarExtrasModal({ isOpen, onClose }) {
                             )}
                           </td>
 
-                          {/* Nombre del Grupo */}
+                          {/* Nombre del Grupo / Descripción Externa */}
                           <td className="px-4 py-3 font-medium text-zinc-900 dark:text-white whitespace-nowrap text-xs">
-                            {nombreGrupo}
+                            <span className="flex items-center gap-1.5">
+                              {nombreGrupo}
+                              {esExterna && (
+                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-500 ring-1 ring-inset ring-sky-500/20">
+                                  EXT
+                                </span>
+                              )}
+                            </span>
                           </td>
 
                           {/* Tema de la clase */}

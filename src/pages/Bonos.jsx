@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { usePeriodos } from '../hooks/usePeriodos';
 import { useClases } from '../hooks/useClases';
+import { useGrupos } from '../hooks/useGrupos';
 import { useCountUp } from '../hooks/useCountUp';
 import { Toggle } from '../components/ui/Toggle';
 import { Button } from '../components/ui/Button';
@@ -17,12 +18,6 @@ const GRADO_OPTIONS = [
   { value: 'none', label: 'None', sub: '0%' },
   { value: 'good', label: 'Good', sub: '+5%' },
   { value: 'amazing', label: 'Amazing', sub: '+10%' },
-];
-
-const REQUISITOS = [
-  { icon: Trophy, text: 'Al menos 10 grupos activos' },
-  { icon: CheckCircle2, text: '15+ alumnos en retención' },
-  { icon: TrendingUp, text: 'Métricas por encima de OK' },
 ];
 
 const MESES_NOMBRES = [
@@ -98,9 +93,20 @@ function DesgloseFila({ label, value, sub, highlight, icon: Icon }) {
 export default function Bonos() {
   const { periodos = [], periodoActual = null, upsertPeriodo, loading: loadingPeriodos } = usePeriodos();
   const { clases = [], loading: loadingClases } = useClases();
+  const { grupos = [] } = useGrupos();
   const [openSimulador, setOpenSimulador] = useState(false);
 
   const loading = loadingPeriodos || loadingClases;
+
+  // ── Grupos activos excluyendo IND (case-insensitive) ─────────────────────
+  // IND groups are individual sessions — they don't count toward the 10-group bonus requirement
+  const gruposActivosNoIND = useMemo(() => {
+    return grupos.filter(
+      (g) =>
+        (g.estado === 'activo' || !g.estado) &&
+        !g.nombre_grupo?.toUpperCase().includes('IND')
+    );
+  }, [grupos]);
 
   // ── Selector dividido: Año y Mes ──────────────────────────────────────────
   const periodosOrdenados = useMemo(
@@ -343,24 +349,38 @@ export default function Bonos() {
             </div>
 
             <div className="px-5 pb-4 space-y-3">
-              {REQUISITOS.map(({ icon: Icon, text }) => (
-                <div key={text} className="flex items-center gap-3">
-                  <div className={[
-                    'w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition-all duration-300',
-                    formState.requisitos_bono
-                      ? 'bg-[var(--accent-color)]/10 text-[var(--accent-color)]'
-                      : 'bg-zinc-200/60 dark:bg-zinc-700/40 text-zinc-400',
-                  ].join(' ')}>
-                    <Icon size={14} />
+              {REQUISITOS.map(({ icon: Icon, text }) => {
+                // For the first requirement (10 grupos activos), show actual live count
+                const isGruposReq = text.includes('10 grupos activos');
+                const displayText = isGruposReq
+                  ? `${gruposActivosNoIND.length} / 10 grupos activos (excluye IND)`
+                  : text;
+                const metGruposReq = isGruposReq && gruposActivosNoIND.length >= 10;
+
+                return (
+                  <div key={text} className="flex items-center gap-3">
+                    <div className={[
+                      'w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition-all duration-300',
+                      formState.requisitos_bono
+                        ? 'bg-[var(--accent-color)]/10 text-[var(--accent-color)]'
+                        : 'bg-zinc-200/60 dark:bg-zinc-700/40 text-zinc-400',
+                    ].join(' ')}>
+                      <Icon size={14} />
+                    </div>
+                    <span className={'text-sm transition-colors duration-200 ' + (formState.requisitos_bono ? 'text-zinc-900 dark:text-white' : 'text-zinc-500 dark:text-zinc-400')}>
+                      {displayText}
+                    </span>
+                    {formState.requisitos_bono && (isGruposReq ? metGruposReq : true) && (
+                      <CheckCircle2 size={14} className="ml-auto shrink-0 text-[var(--accent-color)]" />
+                    )}
+                    {isGruposReq && !metGruposReq && gruposActivosNoIND.length > 0 && (
+                      <span className="ml-auto text-[10px] font-semibold text-amber-500">
+                        Faltan {10 - gruposActivosNoIND.length}
+                      </span>
+                    )}
                   </div>
-                  <span className={'text-sm transition-colors duration-200 ' + (formState.requisitos_bono ? 'text-zinc-900 dark:text-white' : 'text-zinc-500 dark:text-zinc-400')}>
-                    {text}
-                  </span>
-                  {formState.requisitos_bono && (
-                    <CheckCircle2 size={14} className="ml-auto shrink-0 text-[var(--accent-color)]" />
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             <div className="px-5 py-4 bg-zinc-100/60 dark:bg-zinc-800/60">

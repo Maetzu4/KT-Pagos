@@ -45,7 +45,7 @@ export default function Clases() {
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       const matchNombre = (c.nombre_clase || c.tema_clase)?.toLowerCase().includes(q);
-      const matchGrupo = c.grupos?.nombre_grupo?.toLowerCase().includes(q);
+      const matchGrupo = (c.es_externa ? c.descripcion_externa : c.grupos?.nombre_grupo)?.toLowerCase().includes(q);
       const matchPeriodo = getNombrePeriodoClase(c.fecha_clase)?.toLowerCase().includes(q);
       return matchNombre || matchGrupo || matchPeriodo;
     }
@@ -81,7 +81,13 @@ export default function Clases() {
 
   const columns = [
     { key: 'fecha_clase',  header: 'Fecha',   render: (r) => formatDate(r.fecha_clase) },
-    { key: 'grupo',        header: 'Grupo',   render: (r) => r.grupos?.nombre_grupo ?? '—' },
+    {
+      key: 'grupo',
+      header: 'Grupo',
+      render: (r) => r.es_externa
+        ? <span className="font-medium text-zinc-900 dark:text-white flex items-center gap-1.5">{r.descripcion_externa || 'Externa'}<span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-500 ring-1 ring-inset ring-sky-500/20">EXT</span></span>
+        : (r.grupos?.nombre_grupo ?? '—')
+    },
     { key: 'nombre_clase', header: 'Clase',   render: (r) => r.nombre_clase || r.tema_clase || '—' },
     {
       key: 'periodo',

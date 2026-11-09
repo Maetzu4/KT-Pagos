@@ -172,10 +172,6 @@ export default function Dashboard() {
   const [toastWarning,        setToastWarning]        = useState(null);
 
   const handleOpenAddExtra = () => {
-    if (!grupos || grupos.length === 0) {
-      setToastWarning('Debes crear un grupo antes de poder añadir clases extra');
-      return;
-    }
     setIsExtraModalOpen(true);
   };
 
@@ -501,7 +497,11 @@ export default function Dashboard() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {pendientes.map((c) => {
               const grupo = grupos.find((g) => String(g.id) === String(c.grupo_id)) || c.grupos;
-              const nombreGrupo = grupo?.nombre_grupo ?? 'Grupo';
+              // For external extras, use descripcion_externa as the display name
+              const esExterna = Boolean(c.es_externa);
+              const nombreGrupo = esExterna
+                ? (c.descripcion_externa || 'Clase Externa')
+                : (grupo?.nombre_grupo ?? 'Grupo');
               const tema = c.tema_clase ?? c.nombre_clase ?? 'Clase programada';
               const esAtrasada = c.fecha_clase < hoyStr;
               const hora = getHoraClase(c, grupo);
@@ -530,6 +530,11 @@ export default function Dashboard() {
                       {c.es_adicional && (
                         <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[var(--accent-color)]/10 text-[var(--accent-color)] ring-1 ring-inset ring-[var(--accent-color)]/20">
                           EXTRA
+                        </span>
+                      )}
+                      {c.es_externa && (
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-500 ring-1 ring-inset ring-sky-500/20">
+                          EXT
                         </span>
                       )}
                     </div>

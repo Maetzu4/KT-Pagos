@@ -154,7 +154,10 @@ export function ResumenClasesModal({ isOpen, open, onClose, clases = [], updateC
                 </thead>
                 <tbody className="divide-y divide-zinc-200/50 dark:divide-zinc-800/50">
                   {filtradas.map((c) => {
-                    const nombreGrupo = c.grupos?.nombre_grupo ?? 'Grupo';
+                    const esExterna = Boolean(c.es_externa);
+                    const nombreGrupo = esExterna
+                      ? (c.descripcion_externa || 'Clase Externa')
+                      : (c.grupos?.nombre_grupo ?? 'Grupo');
                     const tema = c.tema_clase ?? c.nombre_clase ?? 'Sin tema especificado';
                     const isUpdating = updatingId?.startsWith(`${c.id}-`);
                     const estado = c.estado_clase || 'Programada';
@@ -173,6 +176,11 @@ export function ResumenClasesModal({ isOpen, open, onClose, clases = [], updateC
                             {c.es_adicional && (
                               <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[var(--accent-color)]/20 text-[var(--accent-color)]">
                                 EXTRA
+                              </span>
+                            )}
+                            {esExterna && (
+                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-500 ring-1 ring-inset ring-sky-500/20">
+                                EXT
                               </span>
                             )}
                           </div>

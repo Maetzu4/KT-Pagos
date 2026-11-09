@@ -480,7 +480,7 @@ export default function Configuracion() {
             const claseLocal = {
               id: rest.id || generateLocalId(),
               user_id: currentUserId,
-              grupo_id: targetGrupoId,
+              grupo_id: targetGrupoId ?? null,
               periodo_id: targetPeriodoId ?? null,
               fecha_clase: rest.fecha_clase,
               estado_clase: rest.estado_clase || 'Programada',
@@ -490,6 +490,9 @@ export default function Configuracion() {
               tema_clase: rest.tema_clase ?? null,
               nombre_clase: rest.nombre_clase ?? null,
               precio_cobrado: rest.precio_cobrado != null ? Number(rest.precio_cobrado) : null,
+              es_externa: Boolean(rest.es_externa),
+              descripcion_externa: rest.descripcion_externa ?? null,
+              tarifa_id: rest.tarifa_id ?? null,
             };
 
             await localDb.clases.put(claseLocal);
@@ -559,7 +562,7 @@ export default function Configuracion() {
 
             const clasePayload = {
               user_id: currentUserId,
-              grupo_id: targetGrupoId,
+              grupo_id: targetGrupoId ?? null,
               periodo_id: targetPeriodoId ?? null,
               fecha_clase: rest.fecha_clase,
               estado_clase: rest.estado_clase || 'Programada',
@@ -568,6 +571,9 @@ export default function Configuracion() {
               tema_clase: rest.tema_clase ?? null,
               nombre_clase: rest.nombre_clase ?? null,
               precio_cobrado: rest.precio_cobrado != null ? Number(rest.precio_cobrado) : null,
+              es_externa: Boolean(rest.es_externa),
+              descripcion_externa: rest.descripcion_externa ?? null,
+              tarifa_id: rest.tarifa_id ?? null,
             };
 
             if (rest.id && !misClasesIds.has(rest.id)) {

@@ -21,6 +21,9 @@ const SELECT_CLASES_OPTIMIZADO = `
   periodo_id,
   grupo_id,
   user_id,
+  es_externa,
+  descripcion_externa,
+  tarifa_id,
   grupos (
     id,
     nombre_grupo,
@@ -239,6 +242,7 @@ export function useClases(filtros = {}) {
   /**
    * Crea una clase aplicando el Motor de Precios (Snapshot):
    * Lee la tarifa del grupo y asigna precio_cobrado según es_adicional.
+   * Si es_externa === true, grupo_id puede ser null y se usa tarifa_id directamente.
    */
   const createClase = async (values) => {
     const {
@@ -251,21 +255,37 @@ export function useClases(filtros = {}) {
       estado_clase,
       en_reclamo,
       recalc,
+      es_externa,
+      descripcion_externa,
+      tarifa_id: tarifaIdExterno,
       ...rest
     } = values;
 
     const isAdicional = Boolean(es_adicional ?? es_extra);
-    const rawGrupoId = String(grupo_id || '').trim();
-    const isPureDigits = /^\d+$/.test(rawGrupoId);
-    const resolvedGrupoId = isPureDigits ? Number(rawGrupoId) : rawGrupoId;
+    const isExterna = Boolean(es_externa);
+
+    // For external extras, grupo_id may be null
+    const rawGrupoId = grupo_id != null ? String(grupo_id).trim() : null;
+    const isPureDigits = rawGrupoId != null && /^\d+$/.test(rawGrupoId);
+    const resolvedGrupoId = rawGrupoId == null ? null : (isPureDigits ? Number(rawGrupoId) : rawGrupoId);
 
     // ── Modo local (IndexedDB) ────────────────────────────────────────────────
     if (isOffline) {
-      const grupo = await localDb.grupos.get(resolvedGrupoId);
-      const tarifa = grupo?.tarifa_id ? await localDb.tarifas.get(grupo.tarifa_id) : null;
-      const precio_cobrado = isAdicional
-        ? (tarifa?.precio_extra ?? 0)
-        : (tarifa?.precio_regular ?? 0);
+      let precio_cobrado = 0;
+
+      if (isExterna && tarifaIdExterno) {
+        // External extra: resolve price directly from tarifa
+        const tarifa = await localDb.tarifas.get(tarifaIdExterno);
+        precio_cobrado = isAdicional
+          ? (tarifa?.precio_extra ?? 0)
+          : (tarifa?.precio_regular ?? 0);
+      } else if (resolvedGrupoId != null) {
+        const grupo = await localDb.grupos.get(resolvedGrupoId);
+        const tarifa = grupo?.tarifa_id ? await localDb.tarifas.get(grupo.tarifa_id) : null;
+        precio_cobrado = isAdicional
+          ? (tarifa?.precio_extra ?? 0)
+          : (tarifa?.precio_regular ?? 0);
+      }
 
       const id = generateLocalId();
       const insertPayload = {
@@ -273,17 +293,23 @@ export function useClases(filtros = {}) {
         grupo_id: resolvedGrupoId,
         user_id: currentUserId,
         fecha_clase,
-        nombre_clase: nombre_clase || tema_clase || null,
-        tema_clase: tema_clase || nombre_clase || null,
+        nombre_clase: nombre_clase || tema_clase || descripcion_externa || null,
+        tema_clase: tema_clase || nombre_clase || descripcion_externa || null,
         estado_clase: estado_clase || 'Programada',
         es_adicional: isAdicional,
         en_reclamo: Boolean(en_reclamo),
         fue_aplazada: Boolean(values.fue_aplazada),
         precio_cobrado,
         periodo_id: null,
+        es_externa: isExterna,
+        descripcion_externa: descripcion_externa || null,
+        tarifa_id: tarifaIdExterno || null,
       };
 
       await localDb.clases.put(insertPayload);
+
+      const grupo = resolvedGrupoId != null ? await localDb.grupos.get(resolvedGrupoId) : null;
+      const tarifa = grupo?.tarifa_id ? await localDb.tarifas.get(grupo.tarifa_id) : null;
       const enrichedNewClase = {
         ...insertPayload,
         grupos: grupo ? { ...grupo, tarifas: tarifa || null } : null,
@@ -295,31 +321,48 @@ export function useClases(filtros = {}) {
     }
 
     // ── Modo online (Supabase) ────────────────────────────────────────────────
-    const { data: grupo, error: gErr } = await supabase
-      .from('grupos')
-      .select('tarifa_id, tarifas(precio_regular, precio_extra)')
-      .eq('id', resolvedGrupoId)
-      .single();
-    if (gErr) throw new Error(gErr.message);
+    let precio_cobrado = 0;
 
-    const tarifa = grupo?.tarifas;
-    if (!tarifa) throw new Error('El grupo no tiene tarifa asociada.');
+    if (isExterna && tarifaIdExterno) {
+      // External extra: fetch price from tarifa directly
+      const { data: tarifa } = await supabase
+        .from('tarifas')
+        .select('precio_regular, precio_extra')
+        .eq('id', tarifaIdExterno)
+        .single();
+      precio_cobrado = isAdicional
+        ? (tarifa?.precio_extra ?? 0)
+        : (tarifa?.precio_regular ?? 0);
+    } else if (resolvedGrupoId != null) {
+      const { data: grupo, error: gErr } = await supabase
+        .from('grupos')
+        .select('tarifa_id, tarifas(precio_regular, precio_extra)')
+        .eq('id', resolvedGrupoId)
+        .single();
+      if (gErr) throw new Error(gErr.message);
 
-    const precio_cobrado = isAdicional ? tarifa.precio_extra : tarifa.precio_regular;
+      const tarifa = grupo?.tarifas;
+      if (!tarifa) throw new Error('El grupo no tiene tarifa asociada.');
+      precio_cobrado = isAdicional ? tarifa.precio_extra : tarifa.precio_regular;
+    }
+
     const onlineUser = await getCurrentUser();
 
     const insertPayload = {
       grupo_id: resolvedGrupoId,
       user_id: onlineUser?.id ?? null,
       fecha_clase,
-      nombre_clase: nombre_clase || tema_clase || null,
-      tema_clase: tema_clase || nombre_clase || null,
+      nombre_clase: nombre_clase || tema_clase || descripcion_externa || null,
+      tema_clase: tema_clase || nombre_clase || descripcion_externa || null,
       estado_clase: estado_clase || 'Programada',
       es_adicional: isAdicional,
       en_reclamo: Boolean(en_reclamo),
       fue_aplazada: Boolean(values.fue_aplazada),
       precio_cobrado,
       periodo_id: null,
+      es_externa: isExterna,
+      descripcion_externa: descripcion_externa || null,
+      tarifa_id: tarifaIdExterno || null,
     };
 
     const { data, error: err } = await supabase
@@ -356,6 +399,9 @@ export function useClases(filtros = {}) {
       'periodo_id',
       'user_id',
       'fue_aplazada',
+      'es_externa',
+      'descripcion_externa',
+      'tarifa_id',
     ]);
 
     const sanitizedPayload = {};
@@ -395,11 +441,16 @@ export function useClases(filtros = {}) {
       };
       await localDb.clases.put(updatedClase);
 
-      const grupo = await localDb.grupos.get(updatedClase.grupo_id);
-      const tarifa = grupo?.tarifa_id ? await localDb.tarifas.get(grupo.tarifa_id) : null;
+      // grupo_id may be null for external extras — handle gracefully
+      const grupoEnriquecido = updatedClase.grupo_id != null
+        ? await localDb.grupos.get(updatedClase.grupo_id)
+        : null;
+      const tarifaEnriquecida = grupoEnriquecido?.tarifa_id
+        ? await localDb.tarifas.get(grupoEnriquecido.tarifa_id)
+        : null;
       const enriched = {
         ...updatedClase,
-        grupos: grupo ? { ...grupo, tarifas: tarifa || null } : null,
+        grupos: grupoEnriquecido ? { ...grupoEnriquecido, tarifas: tarifaEnriquecida || null } : null,
       };
 
       clasesCache.clear();

@@ -57,10 +57,6 @@ export default function Grupos() {
   };
 
   const handleOpenGestionExtras = () => {
-    if (!grupos || grupos.length === 0) {
-      setToastWarning('Debes crear un grupo antes de poder añadir clases extra');
-      return;
-    }
     setShowGestionExtras(true);
   };
   const openEdit   = (g) => setModal(g);

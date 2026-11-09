@@ -16,6 +16,14 @@ localDb.version(1).stores({
   clases: 'id, grupo_id, periodo_id, user_id, fecha_clase, estado_clase, es_adicional, fue_aplazada, en_reclamo',
 });
 
+// Version 2: adds es_externa, descripcion_externa, tarifa_id on clases for external extras
+localDb.version(2).stores({
+  tarifas: 'id, duracion_minutos, user_id',
+  grupos: 'id, id_externo, nombre_grupo, estado, tarifa_id, user_id, fecha_inicio_grupo, leccion_inicio_cobro',
+  periodos: 'id, key_periodo, mes, anio, user_id',
+  clases: 'id, grupo_id, periodo_id, user_id, fecha_clase, estado_clase, es_adicional, fue_aplazada, en_reclamo, es_externa',
+});
+
 /**
  * Genera un UUID estándar (v4) para asegurar compatibilidad total con Supabase.
  */
