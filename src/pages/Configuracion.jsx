@@ -22,6 +22,7 @@ import { formatCurrency } from '../lib/utils';
 const DEFAULT_TARIFA = { duracion_minutos: '', precio_regular: '', precio_extra: '' };
 
 function TarifaForm({ initial, onSubmit, onCancel }) {
+  const { t } = useTranslation();
   const [form, setForm] = useState({ ...DEFAULT_TARIFA, ...initial });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -31,7 +32,7 @@ function TarifaForm({ initial, onSubmit, onCancel }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.duracion_minutos || !form.precio_regular || !form.precio_extra) {
-      setError('Todos los campos son obligatorios.');
+      setError(t('common.allFieldsRequired', 'Todos los campos son obligatorios.'));
       return;
     }
     setSaving(true);
@@ -52,7 +53,7 @@ function TarifaForm({ initial, onSubmit, onCancel }) {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <FormField label="Duración (minutos)" required className="md:col-span-2">
+        <FormField label={t('settings.rateDuration', 'Duración (minutos)')} required className="md:col-span-2">
           <Input
             id="duracion_minutos"
             type="number"
@@ -62,7 +63,7 @@ function TarifaForm({ initial, onSubmit, onCancel }) {
             placeholder="Ej. 60"
           />
         </FormField>
-        <FormField label="Precio Regular ($)" required>
+        <FormField label={t('settings.rateRegularPrice', 'Precio Regular ($)')} required>
           <Input
             id="precio_regular"
             type="number"
@@ -73,7 +74,7 @@ function TarifaForm({ initial, onSubmit, onCancel }) {
             placeholder="0.00"
           />
         </FormField>
-        <FormField label="Precio Extra ($)" required>
+        <FormField label={t('settings.rateExtraPrice', 'Precio Extra ($)')} required>
           <Input
             id="precio_extra"
             type="number"
@@ -87,8 +88,8 @@ function TarifaForm({ initial, onSubmit, onCancel }) {
       </div>
       {error && <p className="text-sm text-red-400">{error}</p>}
       <div className="flex justify-end gap-3 pt-2">
-        <Button type="button" variant="ghost" onClick={onCancel}>Cancelar</Button>
-        <Button type="submit" loading={saving}>{initial?.id ? 'Guardar' : 'Crear tarifa'}</Button>
+        <Button type="button" variant="ghost" onClick={onCancel}>{t('common.cancel', 'Cancelar')}</Button>
+        <Button type="submit" loading={saving}>{initial?.id ? t('common.save', 'Guardar') : t('settings.newRate', 'Crear tarifa')}</Button>
       </div>
     </form>
   );
@@ -137,7 +138,7 @@ export default function Configuracion() {
 
   const copiarCorreo = () => {
     navigator.clipboard.writeText('6814natsu@gmail.com');
-    showNotif('¡Correo copiado al portapapeles!');
+    showNotif(t('settings.copiedEmail', '¡Correo copiado al portapapeles!'));
   };
 
   // Helper para consultar todas las filas con paginación (evita el límite de 1000 filas de PostgREST)
@@ -671,7 +672,7 @@ export default function Configuracion() {
       localStorage.removeItem('kt_onboarding_v1');
       setShowDangerModal(false);
       setConfirmDeleteText('');
-      showNotif('Todos tus datos han sido eliminados correctamente.', 'ok');
+      showNotif(t('settings.allDataDeletedSuccess', 'Todos tus datos locales han sido eliminados correctamente.'), 'ok');
       setTimeout(() => {
         window.location.reload();
       }, 2000);
@@ -684,16 +685,16 @@ export default function Configuracion() {
   };
 
   const columns = [
-    { key: 'duracion_minutos', header: 'Duración', render: (r) => `${r.duracion_minutos} min` },
-    { key: 'precio_regular', header: 'Precio Regular', render: (r) => formatCurrency(r.precio_regular) },
-    { key: 'precio_extra', header: 'Precio Extra', render: (r) => formatCurrency(r.precio_extra) },
+    { key: 'duracion_minutos', header: t('settings.rateDuration', 'Duración (minutos)'), render: (r) => `${r.duracion_minutos} min` },
+    { key: 'precio_regular', header: t('settings.rateRegularPrice', 'Precio Regular ($)'), render: (r) => formatCurrency(r.precio_regular) },
+    { key: 'precio_extra', header: t('settings.rateExtraPrice', 'Precio Extra ($)'), render: (r) => formatCurrency(r.precio_extra) },
     {
       key: 'actions',
       header: '',
       cellClassName: 'text-right',
       render: (r) => (
         <div className="flex gap-1.5 justify-end">
-          <Button size="icon" variant="ghost" onClick={() => setModal(r)} aria-label="Editar tarifa">
+          <Button size="icon" variant="ghost" onClick={() => setModal(r)} aria-label={t('settings.editRate', 'Editar tarifa')}>
             <Pencil size={13} />
           </Button>
           <Button
@@ -701,7 +702,7 @@ export default function Configuracion() {
             variant="danger"
             loading={deleting === r.id}
             onClick={() => setConfirmId(r.id)}
-            aria-label="Eliminar tarifa"
+            aria-label={t('settings.deleteRate', 'Eliminar tarifa')}
           >
             <Trash2 size={13} />
           </Button>
@@ -713,8 +714,8 @@ export default function Configuracion() {
   return (
     <div className="animate-fade-in max-w-2xl">
       <div className="hidden md:block mb-8">
-        <h1 className="text-2xl font-semibold text-zinc-900 dark:text-white">Configuración</h1>
-        <p className="text-sm text-zinc-500 mt-1">Personaliza la app y gestiona tarifas</p>
+        <h1 className="text-2xl font-semibold text-zinc-900 dark:text-white">{t('settings.title', 'Configuración')}</h1>
+        <p className="text-sm text-zinc-500 mt-1">{t('settings.subtitle', 'Personaliza la app y gestiona tarifas')}</p>
       </div>
 
       <div className="space-y-6 md:space-y-8">
@@ -726,11 +727,11 @@ export default function Configuracion() {
               <User size={18} className="text-[var(--accent-color)]" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Cuenta activa</p>
+              <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">{t('settings.activeAccount', 'Cuenta activa')}</p>
               <p className="text-sm font-semibold text-zinc-900 dark:text-white truncate">{currentUser.email}</p>
               <p className="text-xs text-zinc-400 font-mono truncate">{currentUser.id}</p>
             </div>
-            <span className="text-xs px-2 py-1 rounded-full bg-[var(--accent-color)]/10 text-[var(--accent-color)] font-medium shrink-0">Activa</span>
+            <span className="text-xs px-2 py-1 rounded-full bg-[var(--accent-color)]/10 text-[var(--accent-color)] font-medium shrink-0">{t('settings.activeStatus', 'Activa')}</span>
           </div>
         </Card>
       ) : (
@@ -740,10 +741,10 @@ export default function Configuracion() {
               <HardDrive size={18} className="text-[var(--accent-color)]" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-zinc-900 dark:text-white truncate">Almacenamiento Local</p>
-              <p className="text-xs text-zinc-400">Tus datos se guardan de forma privada en tu navegador</p>
+              <p className="text-sm font-semibold text-zinc-900 dark:text-white truncate">{t('settings.localStorage', 'Almacenamiento Local')}</p>
+              <p className="text-xs text-zinc-400">{t('settings.localStorageDesc', 'Tus datos se guardan de forma privada en tu navegador')}</p>
             </div>
-            <span className="text-xs px-2 py-1 rounded-full bg-[var(--accent-color)]/10 text-[var(--accent-color)] font-medium shrink-0">Local</span>
+            <span className="text-xs px-2 py-1 rounded-full bg-[var(--accent-color)]/10 text-[var(--accent-color)] font-medium shrink-0">{t('settings.localStatus', 'Local')}</span>
           </div>
         </Card>
       )}
@@ -756,8 +757,8 @@ export default function Configuracion() {
               <HelpCircle size={18} className="text-[var(--accent-color)]" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-zinc-900 dark:text-white">Guía y Tips de Inicio</p>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">Repasa el flujo ideal de trabajo y recomendaciones</p>
+              <p className="text-sm font-semibold text-zinc-900 dark:text-white">{t('settings.guideAndTips', 'Guía y Tips de Inicio')}</p>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">{t('settings.guideAndTipsDesc', 'Repasa el flujo ideal de trabajo y recomendaciones')}</p>
             </div>
           </div>
           <Button
@@ -767,14 +768,14 @@ export default function Configuracion() {
             className="flex items-center justify-center gap-2 text-xs font-semibold shrink-0"
           >
             <HelpCircle size={14} className="text-[var(--accent-color)]" />
-            Ver Tips de Uso
+            {t('settings.viewTips', 'Ver Tips de Uso')}
           </Button>
         </div>
       </Card>
 
       {/* ── Apariencia ── */}
       <Card>
-        <h2 className="text-sm font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider mb-5">Apariencia</h2>
+        <h2 className="text-sm font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider mb-5">{t('settings.appearance', 'Apariencia')}</h2>
 
         <div className="space-y-6">
           {/* Dark / Light Mode */}
@@ -782,8 +783,8 @@ export default function Configuracion() {
             <div className="flex items-center gap-3">
               {mode === 'dark' ? <Moon size={18} className="text-zinc-400" /> : <Sun size={18} className="text-amber-500" />}
               <div>
-                <p className="text-sm font-medium text-zinc-900 dark:text-white">Modo {mode === 'dark' ? 'oscuro' : 'claro'}</p>
-                <p className="text-xs text-zinc-500">Fondo {mode === 'dark' ? '#000000' : '#FFFFFF'}</p>
+                <p className="text-sm font-medium text-zinc-900 dark:text-white">{t('settings.modeLabel', 'Modo {{mode}}', { mode: mode === 'dark' ? t('settings.dark', 'oscuro') : t('settings.light', 'claro') })}</p>
+                <p className="text-xs text-zinc-500">{t('settings.background', 'Fondo {{color}}', { color: mode === 'dark' ? '#000000' : '#FFFFFF' })}</p>
               </div>
             </div>
             <Toggle
@@ -795,8 +796,8 @@ export default function Configuracion() {
 
           {/* Color de acento */}
           <div>
-            <p className="text-sm font-medium text-zinc-900 dark:text-white mb-1">Color de Acento</p>
-            <p className="text-xs text-zinc-500 mb-3">Afecta botones, bordes activos y gráficas</p>
+            <p className="text-sm font-medium text-zinc-900 dark:text-white mb-1">{t('settings.accentColor', 'Color de Acento')}</p>
+            <p className="text-xs text-zinc-500 mb-3">{t('settings.accentColorDesc', 'Afecta botones, bordes activos y gráficas')}</p>
             <ColorPicker />
           </div>
         </div>
@@ -853,10 +854,10 @@ export default function Configuracion() {
         <div className="flex items-center justify-between mb-2">
           <div>
             <h2 className="text-sm font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider">
-              Importar Datos
+              {t('settings.importData', 'Importar Datos')}
             </h2>
             <p className="text-xs text-zinc-500 mt-0.5">
-              Sincroniza grupos desde un archivo JSON y genera las clases automáticamente.
+              {t('settings.importDataDesc', 'Sincroniza grupos desde un archivo JSON y genera las clases automáticamente.')}
             </p>
           </div>
         </div>
@@ -870,7 +871,7 @@ export default function Configuracion() {
                      font-semibold text-sm transition-all duration-200 group"
         >
           <Database size={16} className="transition-transform duration-200 group-hover:scale-110" />
-          Importar datos en JSON
+          {t('settings.importJsonBtn', 'Importar datos en JSON')}
         </button>
       </Card>
 
@@ -879,10 +880,10 @@ export default function Configuracion() {
         <div className="flex items-center justify-between mb-2">
           <div>
             <h2 className="text-sm font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider">
-              Respaldo de Datos
+              {t('settings.backupTitle', 'Respaldo de Datos')}
             </h2>
             <p className="text-xs text-zinc-500 mt-0.5">
-              Descarga una copia completa en JSON o restaura un respaldo previo de tus datos.
+              {t('settings.backupDesc', 'Descarga una copia completa en JSON o restaura un respaldo previo de tus datos.')}
             </p>
           </div>
         </div>
@@ -894,7 +895,7 @@ export default function Configuracion() {
             id="btn-descargar-backup"
             className="w-full flex items-center justify-center gap-2 py-3 border border-[var(--accent-color)] text-[var(--accent-color)] bg-transparent hover:bg-[var(--accent-color)]/10 font-semibold text-sm transition-all duration-200"
           >
-            <Download size={16} /> Descargar Backup
+            <Download size={16} /> {t('settings.downloadBackup', 'Descargar Backup')}
           </Button>
 
           <div>
@@ -912,7 +913,7 @@ export default function Configuracion() {
               id="btn-restaurar-backup"
               className="w-full flex items-center justify-center gap-2 py-3 bg-[var(--accent-color)] text-white hover:opacity-90 font-semibold text-sm transition-all duration-200"
             >
-              <Upload size={16} /> Restaurar Backup
+              <Upload size={16} /> {t('settings.restoreBackup', 'Restaurar Backup')}
             </Button>
           </div>
         </div>
@@ -921,16 +922,16 @@ export default function Configuracion() {
       {/* ── Tarifas ── */}
       <Card>
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-sm font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider">Tarifas</h2>
+          <h2 className="text-sm font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider">{t('settings.rates', 'Tarifas')}</h2>
           <Button size="sm" onClick={() => setModal('create')} id="btn-crear-tarifa">
-            <Plus size={14} /> Nueva tarifa
+            <Plus size={14} /> {t('settings.newRate', 'Nueva tarifa')}
           </Button>
         </div>
         <Table
           columns={columns}
           data={tarifas}
           loading={loading}
-          emptyMessage="No hay tarifas. Crea una para poder asignarla a los grupos."
+          emptyMessage={t('settings.noRates', 'No hay tarifas. Crea una para poder asignarla a los grupos.')}
         />
       </Card>
 
@@ -939,14 +940,29 @@ export default function Configuracion() {
         <div className="flex items-center gap-2 mb-4 select-none">
           <Heart size={18} className="text-[var(--accent-color)] fill-[var(--accent-color)]" />
           <h2 className="text-sm font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider">
-            Hecho con amor por <a className="text-[var(--accent-color)] hover:underline" href="https://github.com/Maetzu4" target="_blank" rel="noopener noreferrer">NATHAN OLMOS</a> del Team 4
+            {(() => {
+              const text = t('settings.madeWithLove', { author: 'NATHAN OLMOS' });
+              const parts = text.split('NATHAN OLMOS');
+              if (parts.length === 2) {
+                return (
+                  <>
+                    {parts[0]}
+                    <a className="text-[var(--accent-color)] hover:underline" href="https://github.com/Maetzu4" target="_blank" rel="noopener noreferrer">
+                      NATHAN OLMOS
+                    </a>
+                    {parts[1]}
+                  </>
+                );
+              }
+              return text;
+            })()}
           </h2>
         </div>
         <button
           onClick={() => setIsDonationModalOpen(true)}
           className="w-full py-3 px-4 bg-zinc-800/40 hover:bg-zinc-800 text-[var(--accent-color)] border-none rounded-lg transition-colors font-medium text-sm text-center"
         >
-          ¿Quieres apoyar este proyecto? Haz clic aquí ☕
+          {t('settings.supportPrompt', '¿Quieres apoyar este proyecto? Haz clic aquí ☕')}
         </button>
       </Card>
 
@@ -955,10 +971,10 @@ export default function Configuracion() {
         <div className="flex items-center justify-between mb-2">
           <div>
             <h2 className="text-sm font-semibold text-[var(--accent-color)] uppercase tracking-wider">
-              Zona de Peligro
+              {t('settings.dangerZone', 'Zona de Peligro')}
             </h2>
             <p className="text-xs text-zinc-500 mt-0.5">
-              Elimina de forma irreversible todas tus clases, grupos, periodos y tarifas asociadas a tu cuenta.
+              {t('settings.dangerZoneDesc', 'Elimina de forma irreversible todas tus clases, grupos, periodos y tarifas asociadas a tu cuenta.')}
             </p>
           </div>
         </div>
@@ -971,39 +987,37 @@ export default function Configuracion() {
             id="btn-borrar-todos-datos"
             className="w-full flex items-center justify-center gap-2 py-3 border border-[var(--accent-color)] text-[var(--accent-color)] bg-transparent hover:bg-[var(--accent-color)]/10 font-semibold text-sm transition-all duration-200"
           >
-            <Trash2 size={16} /> Borrar todos mis datos
+            <Trash2 size={16} /> {t('settings.deleteMyData', 'Borrar todos mis datos')}
           </Button>
         </div>
       </Card>
 
-      <Modal open={isDonationModalOpen} onClose={() => setIsDonationModalOpen(false)} title="Apoyar el proyecto">
+      <Modal open={isDonationModalOpen} onClose={() => setIsDonationModalOpen(false)} title={t('settings.supportProject', 'Apoyar el proyecto')}>
         <div className="space-y-4 text-sm text-zinc-600 dark:text-zinc-400">
           <div>
-            Si eres de Colombia, puedes apoyar este proyecto por <strong>BRE-B</strong>:
-            <br />
+            {t('settings.supportModalCol')}
             <div className="flex items-center gap-2 mt-2">
               <span className="bg-zinc-100 dark:bg-zinc-800/50 px-3 py-1.5 rounded-md text-sm font-mono text-[var(--accent-color)]">
                 6814natsu@gmail.com
               </span>
               <Button size="sm" variant="ghost" onClick={copiarCorreo}>
-                Copiar
+                {t('settings.copy')}
               </Button>
             </div>
           </div>
           <div>
-            Si eres de otro país también puedes apoyar por <strong>PayPal</strong>:
-            <br />
+            {t('settings.supportModalIntl')}
             <div className="flex items-center gap-2 mt-2">
               <span className="bg-zinc-100 dark:bg-zinc-800/50 px-3 py-1.5 rounded-md text-sm font-mono text-[var(--accent-color)]">
                 6814natsu@gmail.com
               </span>
               <Button size="sm" variant="ghost" onClick={copiarCorreo}>
-                Copiar
+                {t('settings.copy')}
               </Button>
             </div>
           </div>
           <p className="font-medium text-zinc-900 dark:text-zinc-300 pt-2 border-t border-zinc-200 dark:border-zinc-800/50">
-            ¡Gracias por tu apoyo para mantener este proyecto de código abierto!
+            {t('settings.supportThanks')}
           </p>
         </div>
       </Modal>
@@ -1016,7 +1030,7 @@ export default function Configuracion() {
             className="w-full"
             onClick={() => setShowLogoutConfirm(true)}
           >
-            <LogOut size={16} /> Cerrar Sesión
+            <LogOut size={16} /> {t('settings.logout', 'Cerrar Sesión')}
           </Button>
         </div>
       )}
@@ -1025,7 +1039,7 @@ export default function Configuracion() {
       <Modal
         open={showImportModal}
         onClose={() => setShowImportModal(false)}
-        title="Importar Grupos"
+        title={t('grupos.importJson', 'Importar Grupos')}
         size="full"
       >
         <ImportadorJSON />
@@ -1035,7 +1049,7 @@ export default function Configuracion() {
       <Modal
         open={!!modal}
         onClose={() => setModal(null)}
-        title={modal === 'create' ? 'Nueva Tarifa' : 'Editar Tarifa'}
+        title={modal === 'create' ? t('settings.newRate', 'Nueva Tarifa') : t('settings.editRate', 'Editar Tarifa')}
         size="sm"
       >
         <TarifaForm
@@ -1048,9 +1062,9 @@ export default function Configuracion() {
       {/* ConfirmDialog eliminar tarifa */}
       <ConfirmDialog
         open={!!confirmId}
-        title="Eliminar tarifa"
-        message="¿Eliminar esta tarifa? Los grupos que la usen perderán la referencia de precio."
-        confirmText="Eliminar"
+        title={t('settings.deleteRate', 'Eliminar tarifa')}
+        message={t('settings.deleteRateConfirm', '¿Eliminar esta tarifa? Los grupos que la usen perderán la referencia de precio.')}
+        confirmText={t('clases.delete', 'Eliminar')}
         onConfirm={handleDeleteConfirm}
         onCancel={() => setConfirmId(null)}
         destructive
@@ -1059,9 +1073,9 @@ export default function Configuracion() {
       {/* ConfirmDialog Logout */}
       <ConfirmDialog
         open={showLogoutConfirm}
-        title="Cerrar Sesión"
-        message="¿Estás seguro de que deseas salir?"
-        confirmText="Salir"
+        title={t('settings.logoutConfirmTitle', 'Cerrar Sesión')}
+        message={t('settings.logoutConfirmMessage', '¿Estás seguro de que deseas salir?')}
+        confirmText={t('settings.logoutConfirmBtn', 'Salir')}
         onConfirm={() => supabase.auth.signOut()}
         onCancel={() => setShowLogoutConfirm(false)}
         destructive
@@ -1076,17 +1090,17 @@ export default function Configuracion() {
             setConfirmDeleteText('');
           }
         }}
-        title="Zona de Peligro"
+        title={t('settings.dangerZone', 'Zona de Peligro')}
         size="sm"
       >
         <div className="space-y-4">
           <p className="text-sm text-zinc-600 dark:text-zinc-300">
-            Esta acción es irreversible y eliminará permanentemente todas tus <strong>clases</strong>, <strong>grupos</strong>, <strong>periodos</strong> y <strong>tarifas</strong> asociadas a tu cuenta.
+            {t('settings.dangerWarning', 'Esta acción es irreversible y eliminará permanentemente todas tus clases, grupos, periodos y tarifas asociadas a tu cuenta.')}
           </p>
 
           <div>
             <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">
-              Para confirmar, escribe <strong className="text-[var(--accent-color)] font-mono">CONFIRMO</strong> en el recuadro:
+              {t('settings.dangerConfirmText', 'Para confirmar, escribe {{word}} en el recuadro:', { word: 'CONFIRMO' })}
             </label>
             <input
               type="text"
@@ -1108,7 +1122,7 @@ export default function Configuracion() {
               }}
               disabled={deletingAll}
             >
-              Cancelar
+              {t('common.cancel', 'Cancelar')}
             </Button>
             <Button
               type="button"
@@ -1118,7 +1132,7 @@ export default function Configuracion() {
               id="btn-confirmar-borrado-total"
               className="bg-[var(--accent-color)] text-white hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed font-semibold text-sm"
             >
-              Borrar definitivamente
+              {t('settings.deleteDefinitely', 'Borrar definitivamente')}
             </Button>
           </div>
         </div>

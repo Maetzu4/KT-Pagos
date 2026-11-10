@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   AlertTriangle, Save, CheckCircle2,
   Trophy, Zap, Sparkles,
@@ -29,6 +30,7 @@ function DesgloseFila({ label, value, sub, highlight, icon: Icon }) {
 
 // ── Modal de Detalle de Periodo ───────────────────────────────────────────────
 export function PeriodoModal({ periodo, open, onClose, onUpdate }) {
+  const { t } = useTranslation();
   const [pagadoReal,   setPagadoReal]   = useState(periodo?.pagado_real ?? 0);
   const [notasReclamo, setNotasReclamo] = useState(periodo?.notas_reclamo ?? '');
   const [saving,       setSaving]       = useState(false);
@@ -88,19 +90,19 @@ export function PeriodoModal({ periodo, open, onClose, onUpdate }) {
           {/* ── Métricas Principales (Bloques sobrios sin bordes) ── */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
             <div className="bg-zinc-50 dark:bg-zinc-800/40 rounded-2xl p-3.5">
-              <p className="text-[10px] text-zinc-500 uppercase tracking-wide mb-1">Total a Cobrar</p>
+              <p className="text-[10px] text-zinc-500 uppercase tracking-wide mb-1">{t('finances.totalToCollect', 'Total a Cobrar')}</p>
               <p className="text-base sm:text-lg font-mono font-bold text-zinc-900 dark:text-white">
                 {formatCurrency(animTotalACobrar)}
               </p>
             </div>
             <div className="bg-zinc-50 dark:bg-zinc-800/40 rounded-2xl p-3.5">
-              <p className="text-[10px] text-zinc-500 uppercase tracking-wide mb-1">Pagado Real</p>
+              <p className="text-[10px] text-zinc-500 uppercase tracking-wide mb-1">{t('finances.realPaid', 'Pagado Real')}</p>
               <p className="text-base sm:text-lg font-mono font-bold text-[var(--accent-color)]">
                 {formatCurrency(animPagado)}
               </p>
             </div>
             <div className="bg-zinc-50 dark:bg-zinc-800/40 rounded-2xl p-3.5">
-              <p className="text-[10px] text-zinc-500 uppercase tracking-wide mb-1">Diferencia</p>
+              <p className="text-[10px] text-zinc-500 uppercase tracking-wide mb-1">{t('finances.difference', 'Diferencia')}</p>
               <p className={`text-base sm:text-lg font-mono font-bold ${errorPositivo ? 'text-zinc-900 dark:text-white' : 'text-[var(--accent-color)]'}`}>
                 {errorPositivo ? '+' : ''}{formatCurrency(animDiferencia)}
               </p>
@@ -112,24 +114,24 @@ export function PeriodoModal({ periodo, open, onClose, onUpdate }) {
             <div className="flex items-center gap-2 pb-1">
               <Sparkles size={15} className="text-[var(--accent-color)]" />
               <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
-                Desglose Financiero del Mes
+                {t('finances.monthFinancialBreakdown', 'Desglose Financiero del Mes')}
               </h3>
             </div>
 
             <div className="divide-y divide-zinc-200/50 dark:divide-zinc-800/50">
               <DesgloseFila
                 icon={CheckCircle2}
-                label="Clases Regulares"
+                label={t('finances.regularClasses', 'Clases Regulares')}
                 value={formatCurrency(animRegulares)}
               />
               <DesgloseFila
                 icon={Zap}
-                label="Clases Extras"
+                label={t('finances.extraClasses', 'Clases Extras')}
                 value={formatCurrency(animExtras)}
               />
               <DesgloseFila
                 icon={Trophy}
-                label="Bono Aplicado"
+                label={t('finances.bonusApplied', 'Bono Aplicado')}
                 sub={pctBono > 0 ? `(${pctBono}%)` : undefined}
                 value={montoBono > 0 ? `+${formatCurrency(animBono)}` : formatCurrency(0)}
                 highlight={montoBono > 0}
@@ -140,22 +142,22 @@ export function PeriodoModal({ periodo, open, onClose, onUpdate }) {
             {deudaAnterior > 0 ? (
               <div className="pt-2 space-y-1.5 font-mono text-xs">
                 <div className="flex justify-between text-zinc-500 pt-2 border-t border-zinc-200/50 dark:border-zinc-800/50">
-                  <span>Subtotal Clases del Mes:</span>
+                  <span>{t('finances.subtotalMonthClasses', 'Subtotal Clases del Mes:')}</span>
                   <span>{formatCurrency(periodo.estimado_real)}</span>
                 </div>
                 <div className={`flex justify-between ${periodo.deuda_resuelta ? 'text-zinc-400 line-through' : 'text-[var(--accent-color)] font-semibold'}`}>
-                  <span>+ Deuda Arrastrada:</span>
+                  <span>+ {t('finances.rolledOverDebt', 'Deuda Arrastrada')}:</span>
                   <span>+{formatCurrency(deudaAnterior)}</span>
                 </div>
                 <div className="flex items-center justify-between rounded-xl bg-[var(--accent-color)]/10 px-3.5 py-2.5 mt-2 text-sm font-bold text-[var(--accent-color)]">
-                  <span>= Total a Cobrar:</span>
+                  <span>= {t('finances.totalToCollect', 'Total a Cobrar')}:</span>
                   <span>{formatCurrency(animTotalACobrar)}</span>
                 </div>
               </div>
             ) : (
               <div className="pt-2">
                 <div className="flex items-center justify-between rounded-xl bg-[var(--accent-color)]/10 px-3.5 py-2.5 text-sm font-bold text-[var(--accent-color)] font-mono">
-                  <span>Total Proyectado:</span>
+                  <span>{t('bonuses.totalProjected', 'Total proyectado')}:</span>
                   <span>{formatCurrency(animTotalACobrar)}</span>
                 </div>
               </div>
@@ -165,7 +167,7 @@ export function PeriodoModal({ periodo, open, onClose, onUpdate }) {
           {/* ── Campo Editable: Pagado Real ── */}
           <div className="rounded-2xl bg-zinc-50 dark:bg-zinc-800/40 p-4 space-y-2">
             <label htmlFor="pagado-real-input" className="block text-xs font-semibold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
-              Pagado Real (editable)
+              {t('finances.realPaidEditable', 'Pagado Real (editable)')}
             </label>
             <div className="relative">
               <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-mono text-zinc-400 font-semibold pointer-events-none">
@@ -190,7 +192,7 @@ export function PeriodoModal({ periodo, open, onClose, onUpdate }) {
                 <div className="flex items-center gap-2">
                   <AlertTriangle size={15} className="text-[var(--accent-color)]" />
                   <span className="text-xs font-semibold text-[var(--accent-color)] uppercase tracking-wide">
-                    Deuda por Reclamos
+                    {t('finances.debtClaims', 'Deuda por Reclamos')}
                   </span>
                 </div>
                 <span className="text-sm font-mono font-bold text-[var(--accent-color)]">
@@ -200,7 +202,7 @@ export function PeriodoModal({ periodo, open, onClose, onUpdate }) {
 
               {clasesEnReclamo.length > 0 && (
                 <div className="space-y-1.5 pt-1">
-                  <p className="text-[11px] text-zinc-500">Clases marcadas con reclamo:</p>
+                  <p className="text-[11px] text-zinc-500">{t('finances.classesWithClaim', 'Clases marcadas con reclamo:')}</p>
                   {clasesEnReclamo.map((c) => (
                     <button
                       key={c.id}
@@ -220,13 +222,13 @@ export function PeriodoModal({ periodo, open, onClose, onUpdate }) {
           {/* ── Notas de Reclamo (opcional) ── */}
           <div className="rounded-2xl bg-zinc-50 dark:bg-zinc-800/40 p-4 space-y-2">
             <label htmlFor="notas-reclamo-input" className="block text-xs font-semibold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
-              Notas del Periodo / Reclamos (opcional)
+              {t('finances.periodNotesClaims', 'Notas del Periodo / Reclamos (opcional)')}
             </label>
             <textarea
               id="notas-reclamo-input"
               value={notasReclamo}
               onChange={(e) => setNotasReclamo(e.target.value)}
-              placeholder="Describe el motivo del reclamo, discrepancias de pago, etc."
+              placeholder={t('finances.periodNotesPlaceholder', 'Describe el motivo del reclamo, discrepancias de pago, etc.')}
               rows={3}
               className="w-full p-3 rounded-xl border-0 bg-white dark:bg-zinc-900/70 text-zinc-900 dark:text-white text-sm placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] transition-all resize-none"
             />
@@ -235,7 +237,7 @@ export function PeriodoModal({ periodo, open, onClose, onUpdate }) {
           {/* ── Footer ── */}
           <div className="flex justify-end pt-2">
             <Button onClick={handleSave} loading={saving} id={`btn-save-periodo-${periodo.id}`} className="px-5">
-              <Save size={15} /> Guardar periodo
+              <Save size={15} /> {t('finances.savePeriod', 'Guardar periodo')}
             </Button>
           </div>
         </div>

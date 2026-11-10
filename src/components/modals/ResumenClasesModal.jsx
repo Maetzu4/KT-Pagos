@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Check, X } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { cn } from '../../lib/utils';
@@ -30,6 +31,7 @@ const getBadgeStyles = (estado) => {
 };
 
 export function ResumenClasesModal({ isOpen, open, onClose, clases = [], updateClase, onAplazar }) {
+  const { t } = useTranslation();
   const isModalOpen = isOpen ?? open ?? false;
   const [filtroEstado, setFiltroEstado] = useState('todos');
   const [updatingId, setUpdatingId] = useState(null);
@@ -80,24 +82,35 @@ export function ResumenClasesModal({ isOpen, open, onClose, clases = [], updateC
     }
   };
 
+  const getEstadoLabel = (est) => {
+    switch (est) {
+      case 'todos': return t('clases.statusAll', 'Todas');
+      case 'Completada': return t('dashboard.statusCompleted', 'Completada');
+      case 'Programada': return t('grupos.filterScheduled', 'Programada');
+      case 'Aplazada': return t('dashboard.statusPostponed', 'Aplazada');
+      case 'Cancelada': return t('dashboard.statusCancelled', 'Cancelada');
+      default: return est;
+    }
+  };
+
   return (
-    <Modal open={isModalOpen} onClose={onClose} title="Resumen de Clases del Mes" size="xl">
+    <Modal open={isModalOpen} onClose={onClose} title={t('clases.summaryTitle', 'Resumen de Clases del Mes')} size="xl">
       <div className="space-y-4">
         {/* Métricas rápidas y filtros en bloque sobrio sin bordes */}
         <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-xl bg-zinc-50 dark:bg-zinc-800/40">
           <div className="flex items-center gap-3 text-xs flex-wrap">
             <span className="font-semibold text-zinc-900 dark:text-white">
-              Total: <span className="font-mono text-sm">{stats.total}</span>
+              {t('clases.totalLabel', 'Total')}: <span className="font-mono text-sm">{stats.total}</span>
             </span>
             <span className="text-[var(--accent-color)] font-medium">
-              {stats.completadas} completadas
+              {t('clases.completedCount', '{{count}} completadas', { count: stats.completadas })}
             </span>
             <span className="text-[var(--accent-color)] font-medium">
-              {stats.pendientes} pendientes
+              {t('clases.pendingCount', '{{count}} pendientes', { count: stats.pendientes })}
             </span>
             {stats.aplazadas > 0 && (
               <span className="text-[var(--accent-color)]/80 text-[11px] font-medium">
-                ({stats.aplazadas} aplazadas)
+                {t('clases.postponedCount', '({{count}} aplazadas)', { count: stats.aplazadas })}
               </span>
             )}
           </div>
@@ -127,7 +140,7 @@ export function ResumenClasesModal({ isOpen, open, onClose, clases = [], updateC
                       : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'
                   )}
                 >
-                  {est === 'todos' ? 'Todas' : est} ({count})
+                  {getEstadoLabel(est)} ({count})
                 </button>
               );
             })}
@@ -137,7 +150,7 @@ export function ResumenClasesModal({ isOpen, open, onClose, clases = [], updateC
         {/* Tabla compacta de clases */}
         {filtradas.length === 0 ? (
           <div className="py-12 text-center text-sm text-zinc-400 dark:text-zinc-500 rounded-xl bg-zinc-50 dark:bg-zinc-800/30">
-            No se encontraron clases con el filtro seleccionado
+            {t('clases.noClassesWithFilter', 'No se encontraron clases con el filtro seleccionado')}
           </div>
         ) : (
           <div className="rounded-xl border border-zinc-200/60 dark:border-zinc-800/50 overflow-hidden bg-white dark:bg-zinc-900 shadow-sm">
@@ -145,20 +158,20 @@ export function ResumenClasesModal({ isOpen, open, onClose, clases = [], updateC
               <table className="w-full text-left text-xs">
                 <thead className="bg-zinc-50 dark:bg-zinc-800/60 sticky top-0 border-b border-zinc-200/60 dark:border-zinc-800/50 text-zinc-500 font-semibold z-10">
                   <tr>
-                    <th className="py-2.5 px-3">Fecha</th>
-                    <th className="py-2.5 px-3">Grupo</th>
-                    <th className="py-2.5 px-3">Tema</th>
-                    <th className="py-2.5 px-3">Estado</th>
-                    <th className="py-2.5 px-3 text-right">Acción</th>
+                    <th className="py-2.5 px-3">{t('clases.date', 'Fecha')}</th>
+                    <th className="py-2.5 px-3">{t('clases.group', 'Grupo')}</th>
+                    <th className="py-2.5 px-3">{t('clases.topic', 'Tema')}</th>
+                    <th className="py-2.5 px-3">{t('clases.status', 'Estado')}</th>
+                    <th className="py-2.5 px-3 text-right">{t('clases.action', 'Acción')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-200/50 dark:divide-zinc-800/50">
                   {filtradas.map((c) => {
                     const esExterna = Boolean(c.es_externa);
                     const nombreGrupo = esExterna
-                      ? (c.descripcion_externa || 'Clase Externa')
-                      : (c.grupos?.nombre_grupo ?? 'Grupo');
-                    const tema = c.tema_clase ?? c.nombre_clase ?? 'Sin tema especificado';
+                      ? (c.descripcion_externa || t('clases.external', 'Externa'))
+                      : (c.grupos?.nombre_grupo ?? '—');
+                    const tema = c.tema_clase ?? c.nombre_clase ?? '—';
                     const isUpdating = updatingId?.startsWith(`${c.id}-`);
                     const estado = c.estado_clase || 'Programada';
                     const estadoDisplay = (c.fue_aplazada && estado === 'Programada') ? 'Aplazada' : estado;
@@ -175,12 +188,12 @@ export function ResumenClasesModal({ isOpen, open, onClose, clases = [], updateC
                             </span>
                             {c.es_adicional && (
                               <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[var(--accent-color)]/20 text-[var(--accent-color)]">
-                                EXTRA
+                                {t('dashboard.badgeExtra', 'EXTRA')}
                               </span>
                             )}
                             {esExterna && (
                               <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-500 ring-1 ring-inset ring-sky-500/20">
-                                EXT
+                                {t('dashboard.badgeExt', 'EXT')}
                               </span>
                             )}
                           </div>
@@ -195,7 +208,7 @@ export function ResumenClasesModal({ isOpen, open, onClose, clases = [], updateC
                               getBadgeStyles(estadoDisplay)
                             )}
                           >
-                            {estadoDisplay}
+                            {getEstadoLabel(estadoDisplay)}
                           </span>
                         </td>
                         <td className="py-2.5 px-3 text-right whitespace-nowrap">
@@ -204,7 +217,7 @@ export function ResumenClasesModal({ isOpen, open, onClose, clases = [], updateC
                               type="button"
                               disabled={isUpdating || estado === 'Completada'}
                               onClick={() => handleEstadoChange(c.id, 'Completada')}
-                              title="Marcar como Completada"
+                              title={t('clases.markCompleted', 'Marcar como Completada')}
                               className={cn(
                                 'px-2 py-1 rounded text-[11px] font-semibold transition-all cursor-pointer inline-flex items-center justify-center',
                                 estado === 'Completada'
@@ -224,21 +237,21 @@ export function ResumenClasesModal({ isOpen, open, onClose, clases = [], updateC
                                   handleEstadoChange(c.id, 'Programada', { fue_aplazada: true });
                                 }
                               }}
-                              title="Aplazar clase y reprogramar"
+                              title={t('clases.reschedule', 'Aplazar clase y reprogramar')}
                               className={cn(
                                 'px-2 py-1 rounded text-[11px] font-medium transition-all border cursor-pointer',
                                 c.fue_aplazada
-                                  ? 'border-[var(--accent-color)] bg-[var(--accent-color)]/20 text-[var(--accent-color)] font-semibold'
-                                  : 'border-[var(--accent-color)] text-[var(--accent-color)] hover:bg-[var(--accent-color)]/10 active:scale-95'
+                                    ? 'border-[var(--accent-color)] bg-[var(--accent-color)]/20 text-[var(--accent-color)] font-semibold'
+                                    : 'border-[var(--accent-color)] text-[var(--accent-color)] hover:bg-[var(--accent-color)]/10 active:scale-95'
                               )}
                             >
-                              Aplazar
+                              {t('clases.postpone', 'Aplazar')}
                             </button>
                             <button
                               type="button"
                               disabled={isUpdating || estado === 'Cancelada'}
                               onClick={() => handleEstadoChange(c.id, 'Cancelada')}
-                              title="Marcar como Cancelada"
+                              title={t('clases.markCancelled', 'Marcar como Cancelada')}
                               className={cn(
                                 'px-2 py-1 rounded text-[11px] font-medium transition-all cursor-pointer inline-flex items-center justify-center',
                                 estado === 'Cancelada'

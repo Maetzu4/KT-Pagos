@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Modal } from '../ui/Modal';
 import { FormField, Input } from '../ui/FormField';
 import { Button } from '../ui/Button';
@@ -8,7 +9,7 @@ import { useClases } from '../../hooks/useClases';
 import { useTarifas } from '../../hooks/useTarifas';
 
 // ── Segmented tab: Interno / Externo ─────────────────────────────────────────
-function TipoSwitch({ value, onChange }) {
+function TipoSwitch({ value, onChange, t }) {
   return (
     <div className="flex gap-1 p-1 rounded-xl bg-zinc-100 dark:bg-zinc-800/60 mb-4">
       {['interno', 'externo'].map((tipo) => (
@@ -23,7 +24,7 @@ function TipoSwitch({ value, onChange }) {
               : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200',
           ].join(' ')}
         >
-          {tipo === 'interno' ? 'Interna' : 'Externa'}
+          {tipo === 'interno' ? t('clases.internal', 'Interna') : t('clases.external', 'Externa')}
         </button>
       ))}
     </div>
@@ -31,6 +32,7 @@ function TipoSwitch({ value, onChange }) {
 }
 
 export function ClaseExtraModal({ isOpen, open, onClose, grupoPreseleccionado, onSuccess }) {
+  const { t } = useTranslation();
   const isModalOpen = Boolean(isOpen ?? open);
   const { grupos, loading: loadingGrupos } = useGrupos();
   const { tarifas, loading: loadingTarifas } = useTarifas();
@@ -73,7 +75,7 @@ export function ClaseExtraModal({ isOpen, open, onClose, grupoPreseleccionado, o
 
   const tarifaOptions = (tarifas || []).map((t) => ({
     value: String(t.id),
-    label: `${t.duracion_minutos} min — $${Number(t.precio_extra ?? t.precio_regular ?? 0).toFixed(2)} extra`,
+    label: `${t.duracion_minutos} min — $${Number(t.precio_extra ?? t.precio_regular ?? 0).toFixed(2)} ${t('clases.extra', 'extra')}`,
   }));
 
   useEffect(() => {
@@ -180,61 +182,61 @@ export function ClaseExtraModal({ isOpen, open, onClose, grupoPreseleccionado, o
   };
 
   return (
-    <Modal open={isModalOpen} onClose={onClose} title="Añadir Clase Extra" size="md">
+    <Modal open={isModalOpen} onClose={onClose} title={t('clases.addExtraClass', 'Añadir Clase Extra')} size="md">
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* ── Selector de tipo ── */}
-        <TipoSwitch value={tipoExtra} onChange={setTipoExtra} />
+        <TipoSwitch value={tipoExtra} onChange={setTipoExtra} t={t} />
 
         {tipoExtra === 'interno' ? (
           <>
             {/* Interno: selector de grupo + tema */}
-            <FormField label="Grupo" required>
+            <FormField label={t('clases.group', 'Grupo')} required>
               <CustomSelect
                 value={grupoId}
                 onChange={setGrupoId}
                 options={grupoOptions}
-                placeholder="Selecciona un grupo…"
+                placeholder={t('clases.selectGroupPlaceholder', 'Selecciona un grupo…')}
                 disabled={loadingGrupos}
               />
             </FormField>
 
-            <FormField label="Tema / Descripción" required>
+            <FormField label={t('clases.themeDescription', 'Tema / Descripción')} required>
               <Input
                 id="tema_clase"
                 type="text"
                 value={temaClase}
                 onChange={(e) => setTemaClase(e.target.value)}
-                placeholder="Ej. Nivelación, Lección adicional, Reposición…"
+                placeholder={t('clases.themePlaceholder', 'Ej. Nivelación, Lección adicional, Reposición…')}
               />
             </FormField>
           </>
         ) : (
           <>
             {/* Externo: tarifa + descripción libre */}
-            <FormField label="Tarifa a Aplicar" required>
+            <FormField label={t('clases.rateToApply', 'Tarifa a Aplicar')} required>
               <CustomSelect
                 value={tarifaId}
                 onChange={setTarifaId}
                 options={tarifaOptions}
-                placeholder="Selecciona una tarifa…"
+                placeholder={t('clases.selectRatePlaceholder', 'Selecciona una tarifa…')}
                 disabled={loadingTarifas}
               />
             </FormField>
 
-            <FormField label="Descripción / Nombre de la Clase" required>
+            <FormField label={t('clases.externalDescLabel', 'Descripción / Nombre de la Clase')} required>
               <Input
                 id="descripcion_externa"
                 type="text"
                 value={descripcionExterna}
                 onChange={(e) => setDescripcionExterna(e.target.value)}
-                placeholder="Ej. Reemplazo Python #123, CSL Nivelación…"
+                placeholder={t('clases.externalDescPlaceholder', 'Ej. Reemplazo Python #123, CSL Nivelación…')}
               />
             </FormField>
           </>
         )}
 
         {/* Fecha común */}
-        <FormField label="Fecha de la Clase" required>
+        <FormField label={t('clases.classDate', 'Fecha de la Clase')} required>
           <Input
             id="fecha_clase"
             type="date"
@@ -247,10 +249,10 @@ export function ClaseExtraModal({ isOpen, open, onClose, grupoPreseleccionado, o
 
         <div className="flex justify-end gap-3 pt-3 border-t border-zinc-200 dark:border-zinc-800">
           <Button type="button" variant="ghost" onClick={onClose} disabled={saving}>
-            Cancelar
+            {t('common.cancel', 'Cancelar')}
           </Button>
           <Button type="submit" loading={saving} id="btn-guardar-clase-extra">
-            Guardar clase extra
+            {t('clases.saveExtraClass', 'Guardar clase extra')}
           </Button>
         </div>
       </form>

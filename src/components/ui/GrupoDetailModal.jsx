@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Plus, Calendar, Clock, ExternalLink, X, ChevronDown, CheckCircle2, CalendarChevronsRight } from 'lucide-react';
 import { Modal } from './Modal';
 import { Badge } from './Badge';
@@ -93,6 +94,7 @@ function EstadoSelector({ clase, claseId, estadoActual, onUpdate, onAplazar }) {
 
 // ─── Modal principal ──────────────────────────────────────────────────────────
 export function GrupoDetailModal({ grupo, open, onClose, onEdit, onClassUpdate }) {
+  const { t } = useTranslation();
   const { isOffline } = useAuth();
   const [clases,             setClases]             = useState([]);
   const [loading,            setLoading]            = useState(false);
@@ -264,7 +266,7 @@ export function GrupoDetailModal({ grupo, open, onClose, onEdit, onClassUpdate }
                 <Clock size={16} />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-[10px] text-zinc-500 uppercase font-semibold tracking-wider">Horario</p>
+                <p className="text-[10px] text-zinc-500 uppercase font-semibold tracking-wider">{t('grupos.schedule', 'Horario')}</p>
                 <p className="text-sm font-medium text-zinc-900 dark:text-white truncate" title={grupo.horario ?? '—'}>
                   {grupo.horario ?? '—'}
                 </p>
@@ -276,7 +278,7 @@ export function GrupoDetailModal({ grupo, open, onClose, onEdit, onClassUpdate }
                 <Calendar size={16} />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-[10px] text-zinc-500 uppercase font-semibold tracking-wider">Inicio</p>
+                <p className="text-[10px] text-zinc-500 uppercase font-semibold tracking-wider">{t('grupos.start', 'Inicio')}</p>
                 <p className="text-sm font-medium text-zinc-900 dark:text-white">
                   {fmtFecha(grupo.fecha_inicio_grupo)}
                 </p>
@@ -288,10 +290,10 @@ export function GrupoDetailModal({ grupo, open, onClose, onEdit, onClassUpdate }
                 <CheckCircle2 size={16} />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-[10px] text-zinc-500 uppercase font-semibold tracking-wider">Progreso</p>
+                <p className="text-[10px] text-zinc-500 uppercase font-semibold tracking-wider">{t('grupos.progress', 'Progreso')}</p>
                 <p className="text-sm font-semibold text-zinc-900 dark:text-white">
                   {completadas}
-                  <span className="font-normal text-zinc-500"> / {clases.length} clases</span>
+                  <span className="font-normal text-zinc-500"> / {clases.length} {t('clases.title', 'Clases').toLowerCase()}</span>
                 </p>
               </div>
             </div>
@@ -300,9 +302,9 @@ export function GrupoDetailModal({ grupo, open, onClose, onEdit, onClassUpdate }
           {/* ── Barra de Acciones y Conteo ── */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
             <div className="text-xs text-zinc-500">
-              <span className="font-semibold text-zinc-900 dark:text-white">{clases.length}</span> clases
+              <span className="font-semibold text-zinc-900 dark:text-white">{clases.length}</span> {t('clases.title', 'Clases').toLowerCase()}
               {programadas > 0 && (
-                <> · <span className="text-[var(--accent-color)] font-medium">{programadas} programadas</span></>
+                <> · <span className="text-[var(--accent-color)] font-medium">{t('grupos.scheduledCount', '{{count}} programadas', { count: programadas })}</span></>
               )}
             </div>
 
@@ -310,7 +312,7 @@ export function GrupoDetailModal({ grupo, open, onClose, onEdit, onClassUpdate }
               {grupo.link_bo && (
                 <a href={grupo.link_bo} target="_blank" rel="noreferrer" className="flex-1 sm:flex-initial">
                   <Button size="sm" variant="ghost" id={`btn-bo-${grupo.id}`} className="w-full sm:w-auto gap-1.5 text-xs">
-                    <ExternalLink size={13} /> Backoffice
+                    <ExternalLink size={13} /> {t('grupos.backoffice', 'Backoffice')}
                   </Button>
                 </a>
               )}
@@ -320,7 +322,7 @@ export function GrupoDetailModal({ grupo, open, onClose, onEdit, onClassUpdate }
                 onClick={() => setIsExtraModalOpen(true)}
                 className="flex-1 sm:flex-initial gap-1.5 text-xs whitespace-nowrap"
               >
-                <Plus size={14} /> Añadir Clase Extra
+                <Plus size={14} /> {t('grupos.addExtraClass', 'Añadir Clase Extra')}
               </Button>
             </div>
           </div>
@@ -328,12 +330,12 @@ export function GrupoDetailModal({ grupo, open, onClose, onEdit, onClassUpdate }
           {/* ── Filtros de clases ── */}
           <div className="flex items-center gap-1.5 overflow-x-auto text-xs py-1 border-b border-zinc-200 dark:border-zinc-800 pb-2">
             {[
-              { key: 'todas', label: 'Todas', count: stats.total },
-              { key: 'Completada', label: 'Completada', count: stats.completadas },
-              { key: 'Programada', label: 'Programada', count: stats.programadas },
-              { key: 'Cancelada', label: 'Cancelada', count: stats.canceladas },
-              { key: 'Aplazadas', label: 'Aplazadas', count: stats.aplazadas },
-              { key: 'Extras', label: 'Extras', count: stats.extras },
+              { key: 'todas', label: t('grupos.filterAll', 'Todas'), count: stats.total },
+              { key: 'Completada', label: t('grupos.filterCompleted', 'Completada'), count: stats.completadas },
+              { key: 'Programada', label: t('grupos.filterScheduled', 'Programada'), count: stats.programadas },
+              { key: 'Cancelada', label: t('grupos.filterCancelled', 'Cancelada'), count: stats.canceladas },
+              { key: 'Aplazadas', label: t('grupos.filterPostponed', 'Aplazadas'), count: stats.aplazadas },
+              { key: 'Extras', label: t('grupos.filterExtras', 'Extras'), count: stats.extras },
             ].map((opt) => (
               <button
                 key={opt.key}
@@ -357,16 +359,16 @@ export function GrupoDetailModal({ grupo, open, onClose, onEdit, onClassUpdate }
               {loading ? (
                 <div className="flex items-center justify-center py-12 text-zinc-500 text-sm gap-2">
                   <div className="w-5 h-5 border-2 border-[var(--accent-color)] border-t-transparent rounded-full animate-spin" />
-                  Cargando clases…
+                  {t('grupos.loadingClasses', 'Cargando clases…')}
                 </div>
               ) : clases.length === 0 ? (
                 <div className="py-12 text-center">
-                  <p className="text-zinc-500 text-sm">No hay clases generadas para este grupo.</p>
-                  <p className="text-zinc-400 text-xs mt-1">Usa el Importador para generarlas automáticamente.</p>
+                  <p className="text-zinc-500 text-sm">{t('grupos.noGeneratedClasses', 'No hay clases generadas para este grupo.')}</p>
+                  <p className="text-zinc-400 text-xs mt-1">{t('grupos.useImporter', 'Usa el Importador para generarlas automáticamente.')}</p>
                 </div>
               ) : clasesFiltradas.length === 0 ? (
                 <div className="py-12 text-center">
-                  <p className="text-zinc-500 text-sm">No hay clases con el filtro seleccionado.</p>
+                  <p className="text-zinc-500 text-sm">{t('clases.noClassesWithFilter', 'No se encontraron clases con el filtro seleccionado')}</p>
                 </div>
               ) : (
                 <table className="min-w-full text-sm">
@@ -376,19 +378,19 @@ export function GrupoDetailModal({ grupo, open, onClose, onEdit, onClassUpdate }
                         #
                       </th>
                       <th className="px-4 py-3 text-left text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider whitespace-nowrap">
-                        Tema
+                        {t('clases.topic', 'Tema')}
                       </th>
                       <th className="px-4 py-3 text-left text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider whitespace-nowrap">
-                        Fecha
+                        {t('clases.date', 'Fecha')}
                       </th>
                       <th className="px-4 py-3 text-left text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider whitespace-nowrap">
-                        Estado
+                        {t('clases.status', 'Estado')}
                       </th>
                       <th className="px-4 py-3 text-center text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider whitespace-nowrap w-24">
-                        Aplazada
+                        {t('grupos.postponedCheckbox', 'Aplazada')}
                       </th>
                       <th className="px-4 py-3 text-center text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider whitespace-nowrap w-16">
-                        Acción
+                        {t('clases.action', 'Acción')}
                       </th>
                     </tr>
                   </thead>
@@ -405,7 +407,7 @@ export function GrupoDetailModal({ grupo, open, onClose, onEdit, onClassUpdate }
                             {c.tema_clase ?? `Lección ${i + 1}`}
                             {c.es_adicional && (
                               <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[var(--accent-color)]/20 text-[var(--accent-color)]">
-                                EXTRA
+                                {t('dashboard.badgeExtra', 'EXTRA')}
                               </span>
                             )}
                           </div>
@@ -431,7 +433,7 @@ export function GrupoDetailModal({ grupo, open, onClose, onEdit, onClassUpdate }
                               checked={Boolean(c.fue_aplazada)}
                               onChange={() => updateClase(c.id, { fue_aplazada: !c.fue_aplazada })}
                               className="w-4 h-4 rounded text-[var(--accent-color)] accent-[var(--accent-color)] focus:ring-[var(--accent-color)]/30 cursor-pointer"
-                              title={c.fue_aplazada ? 'Marcada como aplazada' : 'Marcar como aplazada'}
+                              title={c.fue_aplazada ? t('grupos.postponedCheckbox', 'Aplazada') : t('grupos.postponedCheckbox', 'Aplazada')}
                             />
                           </label>
                         </td>
@@ -441,7 +443,7 @@ export function GrupoDetailModal({ grupo, open, onClose, onEdit, onClassUpdate }
                             type="button"
                             disabled={isAplazando}
                             onClick={() => handleAplazarMasivo(c)}
-                            title="Aplazar 1 semana (esta y posteriores)"
+                            title={t('grupos.postponeBatch', 'Aplazar 1 semana (esta y posteriores)')}
                             className="inline-flex items-center justify-center p-1.5 rounded-lg text-zinc-500 hover:text-[var(--accent-color)] hover:bg-[var(--accent-color)]/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
                           >
                             <CalendarChevronsRight size={16} />
@@ -458,10 +460,10 @@ export function GrupoDetailModal({ grupo, open, onClose, onEdit, onClassUpdate }
           {/* ── Footer ── */}
           <div className="flex justify-between items-center pt-2 border-t border-zinc-200 dark:border-zinc-800">
             <Button size="sm" variant="ghost" onClick={() => { onClose(); onEdit?.(grupo); }}>
-              Editar grupo
+              {t('grupos.editGroup', 'Editar grupo')}
             </Button>
             <Button size="sm" variant="ghost" onClick={onClose}>
-              <X size={13} /> Cerrar
+              <X size={13} /> {t('grupos.close', 'Cerrar')}
             </Button>
           </div>
         </div>
@@ -489,8 +491,8 @@ export function GrupoDetailModal({ grupo, open, onClose, onEdit, onClassUpdate }
       {/* ── Confirmación de aplazo masivo ── */}
       <ConfirmDialog
         open={showAplazarConfirm}
-        title="Aplazar clases en lote"
-        message="¿Seguro que deseas aplazar esta clase y TODAS las programadas posteriormente exactamente 7 días?"
+        title={t('grupos.postponeBatchTitle', 'Aplazar clases en lote')}
+        message={t('grupos.postponeBatchMessage', '¿Seguro que deseas aplazar esta clase y TODAS las programadas posteriormente exactamente 7 días?')}
         onConfirm={confirmarAplazarMasivo}
         onCancel={() => { setShowAplazarConfirm(false); setClaseParaAplazar(null); }}
       />

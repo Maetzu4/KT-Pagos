@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   AlertTriangle, TrendingUp,
   CheckCircle2, RotateCcw, DollarSign,
@@ -14,7 +15,7 @@ import { formatCurrency } from '../lib/utils';
 import { formatDate } from '../lib/dateUtils';
 
 // ── Tarjeta compacta para la cuadrícula de periodos pasados ───────────────────
-function PeriodoCompactCard({ periodo, onClick }) {
+function PeriodoCompactCard({ periodo, onClick, t }) {
   const pagado = Number(periodo?.pagado_real || 0);
   const animPagado = useCountUp(pagado);
 
@@ -40,7 +41,7 @@ function PeriodoCompactCard({ periodo, onClick }) {
 
       <div className="pt-2.5 border-t border-zinc-200/50 dark:border-zinc-700/40 flex items-baseline justify-between">
         <span className="text-xs font-medium text-zinc-500 uppercase tracking-wider">
-          Pagado
+          {t ? t('finances.paid', 'Pagado') : 'Pagado'}
         </span>
         <span className="text-lg font-mono font-bold text-[var(--accent-color)]">
           {formatCurrency(animPagado)}
@@ -52,6 +53,7 @@ function PeriodoCompactCard({ periodo, onClick }) {
 
 // ── Vista Principal de Finanzas ───────────────────────────────────────────────
 export default function Finanzas() {
+  const { t } = useTranslation();
   // ── 1. Hooks de estado y contexto ──────────────────────────────────────────
   const { periodos, loading, updatePeriodo, metricas, periodoActual } = usePeriodos();
   const [selectedPeriodo, setSelectedPeriodo] = useState(null);
@@ -147,15 +149,15 @@ export default function Finanzas() {
       <div className="space-y-6 md:space-y-8 animate-fade-in">
         <div className="flex flex-row justify-between items-start gap-4">
           <div className="hidden md:block">
-            <h1 className="text-2xl font-semibold text-zinc-900 dark:text-white">Finanzas</h1>
-            <p className="text-sm text-zinc-500 mt-0.5">Cortes mensuales y seguimiento de pagos</p>
+            <h1 className="text-2xl font-semibold text-zinc-900 dark:text-white">{t('finances.title', 'Finanzas')}</h1>
+            <p className="text-sm text-zinc-500 mt-0.5">{t('finances.subtitle', 'Cortes mensuales y seguimiento de pagos')}</p>
           </div>
           <div className="w-full md:w-auto shrink-0">
             <CustomSelect
               value={filtroAnio}
               onChange={setFiltroAnio}
               options={aniosDisponibles}
-              placeholder="Año"
+              placeholder={t('finances.year', 'Año')}
               className="w-full md:w-36 bg-zinc-100 dark:bg-zinc-800/50 border-0 rounded-xl font-medium focus:ring-2 focus:ring-[var(--accent-color)] text-xs sm:text-sm"
             />
           </div>
@@ -166,10 +168,10 @@ export default function Finanzas() {
             <CalendarX size={24} />
           </div>
           <p className="text-base font-semibold text-zinc-900 dark:text-white">
-            Aún no hay clases registradas para este periodo.
+            {t('finances.noClassesPeriod', 'Aún no hay clases registradas para este periodo.')}
           </p>
           <p className="text-xs sm:text-sm text-zinc-500 mt-1 max-w-sm">
-            Completa o añade clases para generar tu reporte financiero.
+            {t('finances.noClassesPeriodDesc', 'Completa o añade clases para generar tu reporte financiero.')}
           </p>
         </div>
       </div>
@@ -181,8 +183,8 @@ export default function Finanzas() {
       {/* ── Cabecera con Selector de Año ── */}
       <div className="flex flex-row justify-between items-start gap-4">
         <div className="hidden md:block">
-          <h1 className="text-2xl font-semibold text-zinc-900 dark:text-white">Finanzas</h1>
-          <p className="text-sm text-zinc-500 mt-0.5">Cortes mensuales y seguimiento de pagos</p>
+          <h1 className="text-2xl font-semibold text-zinc-900 dark:text-white">{t('finances.title', 'Finanzas')}</h1>
+          <p className="text-sm text-zinc-500 mt-0.5">{t('finances.subtitle', 'Cortes mensuales y seguimiento de pagos')}</p>
         </div>
 
         {/* Selector de Año */}
@@ -191,7 +193,7 @@ export default function Finanzas() {
             value={filtroAnio}
             onChange={setFiltroAnio}
             options={aniosDisponibles}
-            placeholder="Año"
+            placeholder={t('finances.year', 'Año')}
             className="w-full md:w-36 bg-zinc-100 dark:bg-zinc-800/50 border-0 rounded-xl font-medium focus:ring-2 focus:ring-[var(--accent-color)] text-xs sm:text-sm"
           />
         </div>
@@ -204,28 +206,28 @@ export default function Finanzas() {
             <CalendarX size={24} />
           </div>
           <p className="text-base font-semibold text-zinc-900 dark:text-white">
-            Aún no hay clases registradas para este periodo.
+            {t('finances.noClassesPeriod', 'Aún no hay clases registradas para este periodo.')}
           </p>
           <p className="text-xs sm:text-sm text-zinc-500 mt-1 max-w-sm">
-            Completa o añade clases para generar tu reporte financiero.
+            {t('finances.noClassesPeriodDesc', 'Completa o añade clases para generar tu reporte financiero.')}
           </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <MetricCard
-            label="Total Estimado"
+            label={t('finances.totalEstimated', 'Total Estimado')}
             value={formatCurrency(animEstimado)}
             icon={TrendingUp}
             className="bg-zinc-50 dark:bg-zinc-800/40 border-0 rounded-2xl"
           />
           <MetricCard
-            label="Total Pagado"
+            label={t('finances.totalPaid', 'Total Pagado')}
             value={<span className="text-[var(--accent-color)]">{formatCurrency(animPagado)}</span>}
             icon={DollarSign}
             className="bg-zinc-50 dark:bg-zinc-800/40 border-0 rounded-2xl"
           />
           <MetricCard
-            label="Total Arrastrado"
+            label={t('finances.totalRolledOver', 'Total Arrastrado')}
             value={formatCurrency(animRollover)}
             icon={RotateCcw}
             className="bg-zinc-50 dark:bg-zinc-800/40 border-0 rounded-2xl"
@@ -237,7 +239,7 @@ export default function Finanzas() {
       {loading ? (
         <div className="flex flex-col items-center justify-center py-20 gap-3">
           <div className="w-8 h-8 border-4 border-[var(--accent-color)] border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm text-zinc-500">Cargando registros financieros...</p>
+          <p className="text-sm text-zinc-500">{t('finances.loadingRecords', 'Cargando registros financieros...')}</p>
         </div>
       ) : !tieneDatos ? null : (
         <div className="space-y-8">
@@ -251,7 +253,7 @@ export default function Finanzas() {
                   </h2>
                   {periodoSeleccionado?.key_periodo === periodoActual?.key_periodo && (
                     <span className="px-2.5 py-0.5 rounded-md bg-[var(--accent-color)]/10 text-[var(--accent-color)] text-[10px] font-bold uppercase tracking-wider">
-                      Periodo Actual
+                      {t('finances.currentPeriod', 'Periodo Actual')}
                     </span>
                   )}
                   <Button
@@ -259,7 +261,7 @@ export default function Finanzas() {
                     onClick={() => setSelectedPeriodo(periodoSeleccionado)}
                     className="text-xs rounded-xl"
                   >
-                    Ver detalles del corte
+                    {t('finances.viewCutoffDetails', 'Ver detalles del corte')}
                   </Button>
                 </div>
 
@@ -272,7 +274,7 @@ export default function Finanzas() {
               <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-4 pb-4 border-b border-zinc-200/50 dark:border-zinc-700/40">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-1">
-                    Total Proyectado / A Cobrar
+                    {t('finances.projectedToCollect', 'Total Proyectado / A Cobrar')}
                   </p>
                   <p className="text-3xl sm:text-4xl font-bold font-mono text-zinc-900 dark:text-white">
                     {formatCurrency(animHeroTotal)}
@@ -281,13 +283,13 @@ export default function Finanzas() {
 
                 <div className="flex items-center gap-6 sm:gap-8 flex-wrap">
                   <div>
-                    <p className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Ganado / Pagado</p>
+                    <p className="text-xs font-medium text-zinc-500 uppercase tracking-wide">{t('finances.earnedPaid', 'Ganado / Pagado')}</p>
                     <p className="text-xl sm:text-2xl font-bold font-mono text-[var(--accent-color)]">
                       {formatCurrency(animHeroPagado)}
                     </p>
                   </div>
                   <div>
-                    <p className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Diferencia</p>
+                    <p className="text-xs font-medium text-zinc-500 uppercase tracking-wide">{t('finances.difference', 'Diferencia')}</p>
                     <p className={`text-xl sm:text-2xl font-bold font-mono ${heroDiferencia >= 0 ? 'text-zinc-900 dark:text-zinc-200' : 'text-[var(--accent-color)]'}`}>
                       {animHeroDiferencia >= 0 ? '+' : ''}
                       {formatCurrency(animHeroDiferencia)}
@@ -299,17 +301,17 @@ export default function Finanzas() {
               {/* Submétricas del Hero */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
                 <div className="rounded-xl bg-white/70 dark:bg-zinc-900/50 p-3.5 text-left">
-                  <p className="text-xs text-zinc-500 mb-1">Clases Impartidas</p>
+                  <p className="text-xs text-zinc-500 mb-1">{t('finances.taughtClasses', 'Clases Impartidas')}</p>
                   <p className="text-base sm:text-lg font-semibold font-mono text-zinc-900 dark:text-white">
                     {Math.round(animHeroClases)}
                     <span className="text-xs font-normal text-zinc-400 ml-1.5 font-sans">
-                      ({periodoSeleccionado?.clases?.filter(c => !c?.es_adicional).length || 0} reg · {periodoSeleccionado?.clases?.filter(c => c?.es_adicional).length || 0} ext)
+                      {t('finances.classesRegExt', '({{reg}} reg · {{ext}} ext)', { reg: periodoSeleccionado?.clases?.filter(c => !c?.es_adicional).length || 0, ext: periodoSeleccionado?.clases?.filter(c => c?.es_adicional).length || 0 })}
                     </span>
                   </p>
                 </div>
 
                 <div className="rounded-xl bg-white/70 dark:bg-zinc-900/50 p-3.5 text-left">
-                  <p className="text-xs text-zinc-500 mb-1">Bono Aplicado</p>
+                  <p className="text-xs text-zinc-500 mb-1">{t('finances.bonusApplied', 'Bono Aplicado')}</p>
                   <p className="text-base sm:text-lg font-semibold font-mono text-zinc-900 dark:text-white">
                     {formatCurrency(animHeroBono)}
                     {(periodoSeleccionado?.multiplicador_bono ?? 0) > 0 && (
@@ -321,7 +323,7 @@ export default function Finanzas() {
                 </div>
 
                 <div className="rounded-xl bg-white/70 dark:bg-zinc-900/50 p-3.5 text-left">
-                  <p className="text-xs text-zinc-500 mb-1">Deuda Arrastrada</p>
+                  <p className="text-xs text-zinc-500 mb-1">{t('finances.rolledOverDebt', 'Deuda Arrastrada')}</p>
                   <p className="text-base sm:text-lg font-semibold font-mono text-zinc-900 dark:text-white">
                     {(periodoSeleccionado?.deuda_anterior ?? 0) > 0 ? (
                       <span className={periodoSeleccionado?.deuda_resuelta ? 'line-through opacity-60 text-zinc-400' : 'text-[var(--accent-color)]'}>
@@ -334,17 +336,17 @@ export default function Finanzas() {
                 </div>
 
                 <div className="rounded-xl bg-white/70 dark:bg-zinc-900/50 p-3.5 text-left">
-                  <p className="text-xs text-zinc-500 mb-1">Estado de Pago</p>
+                  <p className="text-xs text-zinc-500 mb-1">{t('finances.paymentStatus', 'Estado de Pago')}</p>
                   <div className="flex items-center gap-1.5 mt-0.5">
                     {(periodoSeleccionado?.pagado_real || 0) >= (periodoSeleccionado?.total_a_cobrar ?? periodoSeleccionado?.estimado_real ?? 0) ? (
                       <>
                         <CheckCircle2 size={16} className="text-emerald-500" />
-                        <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">Cubierto</span>
+                        <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">{t('finances.covered', 'Cubierto')}</span>
                       </>
                     ) : (
                       <>
                         <AlertTriangle size={16} className="text-[var(--accent-color)]" />
-                        <span className="text-sm font-semibold text-[var(--accent-color)]">Diferencia Pendiente</span>
+                        <span className="text-sm font-semibold text-[var(--accent-color)]">{t('finances.pendingDifference', 'Diferencia Pendiente')}</span>
                       </>
                     )}
                   </div>
@@ -359,7 +361,7 @@ export default function Finanzas() {
               <div className="flex items-center gap-2">
                 <Sparkles size={16} className="text-[var(--accent-color)]" />
                 <h3 className="text-sm font-semibold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
-                  Otros Periodos
+                  {t('finances.otherPeriods', 'Otros Periodos')}
                 </h3>
               </div>
 
@@ -369,6 +371,7 @@ export default function Finanzas() {
                     key={p?.key_periodo ?? p?.id}
                     periodo={p}
                     onClick={() => setSelectedPeriodo(p)}
+                    t={t}
                   />
                 ))}
               </div>

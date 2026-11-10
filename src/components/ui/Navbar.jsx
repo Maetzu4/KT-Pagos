@@ -1,32 +1,35 @@
 import { useRef } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Users, BarChart3, Settings, Trophy } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../hooks/useAuth';
 import { cn } from '../../lib/utils';
 import { Sidebar } from './Sidebar';
 
 const NAV_ITEMS = [
-  { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/finanzas', icon: BarChart3, label: 'Finanzas' },
-  { to: '/bonos', icon: Trophy, label: 'Bonos' },
-  { to: '/grupos', icon: Users, label: 'Grupos' },
-  { to: '/configuracion', icon: Settings, label: 'Config' },
+  { to: '/',              icon: LayoutDashboard, labelKey: 'dashboard',     defaultLabel: 'Dashboard' },
+  { to: '/finanzas',      icon: BarChart3,        labelKey: 'finanzas',      defaultLabel: 'Finanzas' },
+  { to: '/bonos',         icon: Trophy,           labelKey: 'bonos',         defaultLabel: 'Bonos' },
+  { to: '/grupos',        icon: Users,            labelKey: 'grupos',        defaultLabel: 'Grupos' },
+  { to: '/configuracion', icon: Settings,         labelKey: 'configuracion', defaultLabel: 'Config' },
 ];
 
-const PAGE_TITLES = {
-  '/': 'Dashboard',
-  '/finanzas': 'Finanzas',
-  '/bonos': 'Bonos',
-  '/grupos': 'Grupos',
-  '/configuracion': 'Configuración',
+const PAGE_TITLE_KEYS = {
+  '/': 'navbar.dashboard',
+  '/finanzas': 'navbar.finanzas',
+  '/bonos': 'navbar.bonos',
+  '/grupos': 'navbar.grupos',
+  '/configuracion': 'navbar.configLong',
 };
 
 export function Navbar() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const { isOffline } = useAuth();
 
-  const currentTitle = PAGE_TITLES[location.pathname] || 'KT-Pagos';
+  const titleKey = PAGE_TITLE_KEYS[location.pathname];
+  const currentTitle = titleKey ? t(titleKey) : 'KT-Pagos';
   const activeIdx = NAV_ITEMS.findIndex(({ to }) =>
     to === '/' ? location.pathname === '/' : location.pathname.startsWith(to)
   );
@@ -70,7 +73,7 @@ export function Navbar() {
         {/* Badge píldora sólida "LOCAL" a la derecha */}
         {isOffline && (
           <span className="bg-[var(--accent-color)] text-white px-3 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase shadow-sm">
-            Local
+            {t('navbar.local', 'Local')}
           </span>
         )}
       </header>
@@ -91,13 +94,15 @@ export function Navbar() {
             />
           )}
 
-          {NAV_ITEMS.map(({ to, icon: Icon }) => {
+          {NAV_ITEMS.map(({ to, icon: Icon, labelKey, defaultLabel }) => {
             const isActive = to === '/' ? location.pathname === '/' : location.pathname.startsWith(to);
             return (
               <NavLink
                 key={to}
                 to={to}
                 end={to === '/'}
+                title={t(`navbar.${labelKey}`, defaultLabel)}
+                aria-label={t(`navbar.${labelKey}`, defaultLabel)}
                 onClick={to === '/configuracion' ? handleSecretAccess : undefined}
                 onTouchStart={to === '/configuracion' ? handleSecretAccess : undefined}
                 className="z-10 relative bg-transparent p-2 flex items-center justify-center cursor-pointer"

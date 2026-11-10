@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { AlertTriangle } from 'lucide-react';
 import { FormField, Input } from '../ui/FormField';
 import { Button } from '../ui/Button';
@@ -33,6 +34,7 @@ function getInitialState(initial) {
 }
 
 export function GrupoForm({ initial, onSubmit, onCancel }) {
+  const { t } = useTranslation();
   const isEditing = !!initial?.id;
   const [form,   setForm]   = useState(() => getInitialState(initial));
   const [saving, setSaving] = useState(false);
@@ -45,11 +47,11 @@ export function GrupoForm({ initial, onSubmit, onCancel }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.nombre_grupo?.trim()) {
-      setError('El nombre del grupo es obligatorio.');
+      setError(t('grupos.errorNombreRequerido', 'El nombre del grupo es obligatorio.'));
       return;
     }
     if (!form.fecha_inicio_grupo) {
-      setError('La fecha de inicio es obligatoria.');
+      setError(t('grupos.errorFechaRequerida', 'La fecha de inicio es obligatoria.'));
       return;
     }
     setSaving(true);
@@ -86,42 +88,42 @@ export function GrupoForm({ initial, onSubmit, onCancel }) {
                         text-[var(--accent-color)]">
           <AlertTriangle size={15} className="shrink-0 mt-0.5 text-[var(--accent-color)]" />
           <p className="text-xs leading-relaxed text-[var(--accent-color)]">
-            <span className="font-semibold text-[var(--accent-color)]">Atención:</span> Modificar la Fecha de Inicio o las Lecciones
-            recalculará todas las clases futuras.
+            <span className="font-semibold text-[var(--accent-color)]">{t('grupos.formAttention', 'Atención:')}</span>{' '}
+            {t('grupos.formAttentionText', 'Modificar la Fecha de Inicio o las Lecciones recalculará todas las clases futuras.')}
           </p>
         </div>
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-        <FormField label="Nombre del Grupo" required className="md:col-span-2">
+        <FormField label={t('grupos.groupName', 'Nombre del Grupo')} required className="md:col-span-2">
           <Input
             id="nombre_grupo"
             value={form.nombre_grupo}
             onChange={set('nombre_grupo')}
-            placeholder="Ej. MC LVL2 #12345"
+            placeholder={t('grupos.groupNamePlaceholder', 'Ej. MC LVL2 #12345')}
           />
         </FormField>
 
-        <FormField label="Curso (Nombre)">
+        <FormField label={t('grupos.courseName', 'Curso (Nombre)')}>
           <Input
             id="curso_nombre"
             value={form.curso_nombre}
             onChange={set('curso_nombre')}
-            placeholder="Ej. Minecraft Education LVL2"
+            placeholder={t('grupos.courseNamePlaceholder', 'Ej. Minecraft Education LVL2')}
           />
         </FormField>
 
-        <FormField label="Curso (Código)">
+        <FormField label={t('grupos.courseCode', 'Curso (Código)')}>
           <Input
             id="curso_codigo"
             value={form.curso_codigo}
             onChange={set('curso_codigo')}
-            placeholder="Ej. MC-LVL2"
+            placeholder={t('grupos.courseCodePlaceholder', 'Ej. MC-LVL2')}
           />
         </FormField>
 
-        <FormField label="Fecha de Inicio" required>
+        <FormField label={t('grupos.startDate', 'Fecha de Inicio')} required>
           <Input
             id="fecha_inicio_grupo"
             type="date"
@@ -130,40 +132,40 @@ export function GrupoForm({ initial, onSubmit, onCancel }) {
           />
         </FormField>
 
-        <FormField label="Horario">
+        <FormField label={t('grupos.schedule', 'Horario')}>
           <Input
             id="horario"
             value={form.horario}
             onChange={set('horario')}
-            placeholder="Ej. Do 12:00"
+            placeholder={t('grupos.schedulePlaceholder', 'Ej. Do 12:00')}
           />
         </FormField>
 
-        <FormField label="Lecciones Totales">
+        <FormField label={t('grupos.totalLessons', 'Lecciones Totales')}>
           <Input
             id="lecciones_totales"
             type="number"
             min="0"
             value={form.lecciones_totales}
             onChange={set('lecciones_totales')}
-            placeholder="Ej. 24"
+            placeholder={t('grupos.totalLessonsPlaceholder', 'Ej. 24')}
           />
         </FormField>
 
-        <FormField label="Duración (minutos)">
+        <FormField label={t('grupos.durationMinutes', 'Duración (minutos)')}>
           <Input
             id="duracion_minutos"
             type="number"
             min="1"
             value={form.duracion_minutos}
             onChange={set('duracion_minutos')}
-            placeholder="Ej. 60"
+            placeholder={t('grupos.durationMinutesPlaceholder', 'Ej. 60')}
           />
         </FormField>
 
         <FormField
-          label="Lección de inicio de cobro"
-          hint="Las lecciones anteriores a este número se marcan como 'Transferida' con \$0 cobrado. Útil para grupos heredados."
+          label={t('grupos.billingStartLesson', 'Lección de inicio de cobro')}
+          hint={t('grupos.billingStartHint', "Las lecciones anteriores a este número se marcan como 'Transferida' con $0 cobrado. Útil para grupos heredados.")}
         >
           <Input
             id="leccion_inicio_cobro"
@@ -175,7 +177,7 @@ export function GrupoForm({ initial, onSubmit, onCancel }) {
           />
         </FormField>
 
-        <FormField label="Link Backoffice" className="md:col-span-2">
+        <FormField label={t('grupos.backofficeLink', 'Link Backoffice')} className="md:col-span-2">
           <Input
             id="link_bo"
             type="url"
@@ -190,9 +192,9 @@ export function GrupoForm({ initial, onSubmit, onCancel }) {
       {error && <p className="text-sm text-red-400">{error}</p>}
 
       <div className="flex justify-end gap-3 pt-2">
-        <Button type="button" variant="ghost" onClick={onCancel}>Cancelar</Button>
+        <Button type="button" variant="ghost" onClick={onCancel}>{t('common.cancel', 'Cancelar')}</Button>
         <Button type="submit" loading={saving}>
-          {isEditing ? 'Guardar cambios' : 'Crear grupo'}
+          {isEditing ? t('grupos.saveChanges', 'Guardar cambios') : t('grupos.createGroup', 'Crear grupo')}
         </Button>
       </div>
     </form>

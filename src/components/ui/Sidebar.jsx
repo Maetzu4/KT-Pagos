@@ -1,19 +1,21 @@
 import { useRef } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, Users, BarChart3, Settings, LogOut, Trophy, User, HardDrive } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuth } from '../../hooks/useAuth';
 import { cn } from '../../lib/utils';
 
 export const NAV_ITEMS = [
-  { to: '/',              icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/finanzas',      icon: BarChart3,        label: 'Finanzas'  },
-  { to: '/bonos',         icon: Trophy,           label: 'Bonos'     },
-  { to: '/grupos',        icon: Users,            label: 'Grupos'    },
-  { to: '/configuracion', icon: Settings,         label: 'Config'    },
+  { to: '/',              icon: LayoutDashboard, labelKey: 'dashboard',     defaultLabel: 'Dashboard' },
+  { to: '/finanzas',      icon: BarChart3,        labelKey: 'finanzas',      defaultLabel: 'Finanzas'  },
+  { to: '/bonos',         icon: Trophy,           labelKey: 'bonos',         defaultLabel: 'Bonos'     },
+  { to: '/grupos',        icon: Users,            labelKey: 'grupos',        defaultLabel: 'Grupos'    },
+  { to: '/configuracion', icon: Settings,         labelKey: 'configuracion', defaultLabel: 'Config'    },
 ];
 
 export function Sidebar() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { user } = useAuth();
 
@@ -60,7 +62,7 @@ export function Sidebar() {
 
       {/* Links de navegación */}
       <div className="flex flex-col gap-1.5 px-2 flex-1">
-        {NAV_ITEMS.map(({ to, icon: Icon, label }) => (
+        {NAV_ITEMS.map(({ to, icon: Icon, labelKey, defaultLabel }) => (
           <NavLink
             key={to}
             to={to}
@@ -74,7 +76,7 @@ export function Sidebar() {
             )}
           >
             <Icon size={18} className="shrink-0 transition-transform duration-200 group-hover:scale-110" />
-            <span className="hidden lg:block">{label}</span>
+            <span className="hidden lg:block">{t(`navbar.${labelKey}`, defaultLabel)}</span>
           </NavLink>
         ))}
       </div>
@@ -98,13 +100,13 @@ export function Sidebar() {
               )}
             >
               <LogOut size={18} className="shrink-0 transition-transform duration-200 group-hover:scale-110" />
-              <span className="hidden lg:block font-medium">Cerrar Sesión</span>
+              <span className="hidden lg:block font-medium">{t('navbar.logout', 'Cerrar Sesión')}</span>
             </button>
           </>
         ) : (
           <div className="hidden lg:flex items-center gap-2 px-3 py-2 rounded-xl bg-zinc-100 dark:bg-zinc-900/60 text-zinc-500 dark:text-zinc-400">
             <HardDrive size={13} className="text-[var(--accent-color)] shrink-0" />
-            <span className="text-xs font-medium truncate">Modo Local</span>
+            <span className="text-xs font-medium truncate">{t('navbar.local', 'Modo Local')}</span>
           </div>
         )}
       </div>

@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback } from 'react';
 import { TrendingUp, DollarSign, Users, CheckCircle2, Calendar, Plus, Info } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid,
 } from 'recharts';
@@ -20,7 +21,7 @@ import { usePeriodos } from '../hooks/usePeriodos';
 import { useClases } from '../hooks/useClases';
 import { useCountUp } from '../hooks/useCountUp';
 import { formatCurrency } from '../lib/utils';
-import { format, startOfMonth, endOfMonth } from 'date-fns';
+import { format, startOfMonth, endOfMonth, parseISO } from 'date-fns';
 import { nombrePeriodo } from '../lib/dateUtils';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -119,6 +120,7 @@ function CustomTooltip({ active, payload, label }) {
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 export default function Dashboard() {
+  const { t, i18n } = useTranslation();
   const { gruposActivos, grupos, loading: loadingGrupos } = useGrupos();
   const {
     periodos, periodoActual, periodoAnterior,
@@ -178,7 +180,7 @@ export default function Dashboard() {
   const handleOpenDesglose = (e) => {
     e?.preventDefault?.();
     if (sinActividadMes || !periodoActual || clasesFiltradas.length === 0) {
-      setToastWarning('Aún no hay clases registradas para mostrar un desglose.');
+      setToastWarning(t('dashboard.noClassesForBreakdown', 'Aún no hay clases registradas para mostrar un desglose.'));
       return;
     }
     setShowDesglose(true);
@@ -284,13 +286,21 @@ export default function Dashboard() {
   const animCompletadas   = useCountUp(loadingClases ? 0 : completadas);
   const animGruposActivos = useCountUp(loadingGrupos ? 0 : gruposActivos.length);
 
-  const nombreMes = periodoActual?.nombre_periodo || nombrePeriodo(new Date());
+  const fechaReferencia = periodoActual?.fecha_inicio
+    ? parseISO(`${periodoActual.fecha_inicio.slice(0, 10)}T12:00:00`)
+    : new Date();
+  const currentLocale = i18n.language?.startsWith('es') ? 'es-MX' : 'en-US';
+  const nombreMes = fechaReferencia
+    .toLocaleDateString(currentLocale, { month: 'long', year: 'numeric' })
+    .replace(/^\w/, (c) => c.toUpperCase());
   const sinActividadMes = !loadingClases && (totalMes === 0 || !periodoActual);
 
   // ── Progreso por grupo (clases completadas en el periodo actual) ───────────
   const progresoByGrupo = useMemo(() => {
     const map = {};
     clasesFiltradas.forEach((c) => {
+      // Clases externas sin grupo_id se omiten del progreso por grupo
+      if (!c.grupo_id) return;
       if (!map[c.grupo_id]) map[c.grupo_id] = { total: 0, completadas: 0 };
       map[c.grupo_id].total++;
       if (c.estado_clase === 'Completada') map[c.grupo_id].completadas++;
@@ -376,9 +386,9 @@ export default function Dashboard() {
   return (
     <div className="animate-fade-in">
       <div className="hidden md:block mb-8">
-        <h1 className="text-2xl font-semibold text-zinc-900 dark:text-white">Dashboard</h1>
+        <h1 className="text-2xl font-semibold text-zinc-900 dark:text-white">{t('dashboard.title', 'Dashboard')}</h1>
         <p className="text-sm text-zinc-500 mt-1">
-          Resumen de {nombreMes}
+          {t('dashboard.summary', { month: nombreMes, defaultValue: `Resumen de ${nombreMes}` })}
         </p>
       </div>
 
@@ -387,7 +397,7 @@ export default function Dashboard() {
       <div className="rounded-2xl bg-[var(--accent-color)] p-6 sm:p-8 text-white shadow-lg shadow-[var(--accent-color)]/20">
         <div className="flex items-center gap-2 mb-2">
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-white/20 text-white backdrop-blur-sm">
-            <TrendingUp size={13} /> Proyectado del Mes
+            <TrendingUp size={13} /> {t('dashboard.projectedMonth', 'Proyectado del Mes')}
           </span>
           <span className="text-xs text-white/80 font-medium">
             · {nombreMes}
@@ -402,7 +412,7 @@ export default function Dashboard() {
           className="mt-3 inline-flex items-center gap-1.5 text-xs text-white/70 hover:text-white transition-colors group cursor-pointer"
         >
           <Info size={12} className="group-hover:scale-110 transition-transform" />
-          Ver desglose
+          {t('dashboard.viewBreakdown', 'Ver desglose')}
         </button>
       </div>
 
@@ -410,29 +420,39 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Ganado este Mes */}
         <MetricCard
-          label="Ganado este Mes"
+          label={t('dashboard.earnedMonth', 'Ganado este Mes')}
           value={formatCurrency(animGanado)}
-          sub="Solo clases completadas"
+          sub={t('dashboard.earnedSub', 'Solo clases completadas')}
           icon={DollarSign}
           onClick={handleOpenDesglose}
         />
 
         {/* Mes Anterior */}
         <MetricCard
-          label="Mes Anterior"
+          label={t('dashboard.previousMonth', 'Mes Anterior')}
           value={formatCurrency(animMesAnterior)}
           sub={
             periodoAnterior?.error_pago < 0 ? (
               <span className="flex items-center gap-1.5">
-                <span className="truncate">Falta {formatCurrency(Math.abs(periodoAnterior.error_pago))}</span>
+                <span className="truncate">
+                  {t('dashboard.missing', {
+                    amount: formatCurrency(Math.abs(periodoAnterior.error_pago)),
+                    defaultValue: `Falta ${formatCurrency(Math.abs(periodoAnterior.error_pago))}`
+                  })}
+                </span>
                 <span className="shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold bg-[var(--accent-color)]/10 text-[var(--accent-color)]">
-                  {new Date().getDate() > 15 ? 'Atrasado' : 'Pendiente'}
+                  {new Date().getDate() > 15
+                    ? t('dashboard.overdue', 'Atrasado')
+                    : t('dashboard.pending', 'Pendiente')}
                 </span>
               </span>
             ) : (
               periodoAnterior?.nombre_periodo
-                ? `${periodoAnterior.nombre_periodo} · Al día`
-                : 'Sin periodo anterior'
+                ? t('dashboard.upToDate', {
+                    period: periodoAnterior.nombre_periodo,
+                    defaultValue: `${periodoAnterior.nombre_periodo} · Al día`
+                  })
+                : t('dashboard.noPreviousPeriod', 'Sin periodo anterior')
             )
           }
           icon={DollarSign}
@@ -441,12 +461,15 @@ export default function Dashboard() {
 
         {/* Clases impartidas */}
         <MetricCard
-          label="Clases Impartidas"
+          label={t('dashboard.taughtClasses', 'Clases Impartidas')}
           value={`${Math.round(animCompletadas)} de ${totalMes}`}
           sub={
             totalMes > 0
-              ? `${Math.round((completadas / totalMes) * 100)}% completado este mes`
-              : 'Sin clases este mes'
+              ? t('dashboard.completedThisMonth', {
+                  pct: Math.round((completadas / totalMes) * 100),
+                  defaultValue: `${Math.round((completadas / totalMes) * 100)}% completado este mes`
+                })
+              : t('dashboard.noClassesThisMonth', 'Sin clases este mes')
           }
           icon={CheckCircle2}
           onClick={() => setShowResumenClases(true)}
@@ -454,9 +477,12 @@ export default function Dashboard() {
 
         {/* Grupos activos */}
         <MetricCard
-          label="Grupos Activos"
+          label={t('dashboard.activeGroups', 'Grupos Activos')}
           value={Math.round(animGruposActivos)}
-          sub={`de ${grupos.length} grupos totales`}
+          sub={t('dashboard.ofTotalGroups', {
+            total: grupos.length,
+            defaultValue: `de ${grupos.length} grupos totales`
+          })}
           icon={Users}
           onClick={() => {
             document.getElementById('seccion-grupos')?.scrollIntoView({ behavior: 'smooth' });
@@ -469,7 +495,7 @@ export default function Dashboard() {
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <h2 className="text-sm font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider">
-              Clases Pendientes
+              {t('dashboard.pendingClasses', 'Clases Pendientes')}
             </h2>
             {pendientes.length > 0 && (
               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-[var(--accent-color)]/10 text-[var(--accent-color)]">
@@ -483,26 +509,26 @@ export default function Dashboard() {
             id="btn-add-clase-extra-dashboard"
             className="h-8 text-xs px-3 shadow-sm"
           >
-            <Plus size={14} /> Añadir Extra
+            <Plus size={14} /> {t('dashboard.addExtra', 'Añadir Extra')}
           </Button>
         </div>
 
         {pendientes.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-zinc-200 dark:border-zinc-800 p-6 text-center">
             <p className="text-sm text-zinc-400 dark:text-zinc-500">
-              No tienes clases programadas pendientes
+              {t('dashboard.noPendingClasses', 'No tienes clases programadas pendientes')}
             </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {pendientes.map((c) => {
               const grupo = grupos.find((g) => String(g.id) === String(c.grupo_id)) || c.grupos;
-              // For external extras, use descripcion_externa as the display name
+              // Clases externas usan descripcion_externa; internas buscan el grupo con fallbacks seguros
               const esExterna = Boolean(c.es_externa);
               const nombreGrupo = esExterna
-                ? (c.descripcion_externa || 'Clase Externa')
-                : (grupo?.nombre_grupo ?? 'Grupo');
-              const tema = c.tema_clase ?? c.nombre_clase ?? 'Clase programada';
+                ? (c.descripcion_externa || t('dashboard.externalClass', 'Clase Externa'))
+                : (grupo?.nombre_grupo ?? c.grupos?.nombre_grupo ?? t('dashboard.unknownGroup', 'Grupo desconocido'));
+              const tema = c.tema_clase ?? c.nombre_clase ?? t('dashboard.scheduledClass', 'Clase programada');
               const esAtrasada = c.fecha_clase < hoyStr;
               const hora = getHoraClase(c, grupo);
 
@@ -519,22 +545,22 @@ export default function Dashboard() {
                       </span>
                       {c.estado_clase === 'Aplazada' && (
                         <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[var(--accent-color)]/10 text-[var(--accent-color)]">
-                          APLAZADA
+                          {t('dashboard.badgePostponed', 'APLAZADA')}
                         </span>
                       )}
                       {esAtrasada && c.estado_clase !== 'Aplazada' && (
                         <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[var(--accent-color)]/10 text-[var(--accent-color)]">
-                          Atrasada
+                          {t('dashboard.badgeOverdue', 'Atrasada')}
                         </span>
                       )}
                       {c.es_adicional && (
                         <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[var(--accent-color)]/10 text-[var(--accent-color)] ring-1 ring-inset ring-[var(--accent-color)]/20">
-                          EXTRA
+                          {t('dashboard.badgeExtra', 'EXTRA')}
                         </span>
                       )}
                       {c.es_externa && (
                         <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-500 ring-1 ring-inset ring-sky-500/20">
-                          EXT
+                          {t('dashboard.badgeExt', 'EXT')}
                         </span>
                       )}
                     </div>
@@ -553,7 +579,7 @@ export default function Dashboard() {
                       onClick={() => handleCambiarEstado(c.id, 'Completada')}
                       className="py-1.5 px-2 rounded-lg text-xs font-semibold bg-[var(--accent-color)] text-white shadow-sm hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 text-center"
                     >
-                      {updatingClase === `${c.id}-Completada` ? '...' : 'Completada'}
+                      {updatingClase === `${c.id}-Completada` ? '...' : t('dashboard.statusCompleted', 'Completada')}
                     </button>
                     <button
                       type="button"
@@ -561,7 +587,7 @@ export default function Dashboard() {
                       onClick={() => handleCambiarEstado(c.id, 'Transferida')}
                       className="py-1.5 px-2 rounded-lg text-xs font-medium text-[var(--accent-color)] bg-[var(--accent-color)]/10 dark:bg-[var(--accent-color)]/20 border border-transparent hover:bg-[var(--accent-color)]/20 dark:hover:bg-[var(--accent-color)]/30 active:scale-[0.98] transition-all disabled:opacity-50 text-center"
                     >
-                      {updatingClase === `${c.id}-Transferida` ? '...' : 'Transferida'}
+                      {updatingClase === `${c.id}-Transferida` ? '...' : t('dashboard.statusTransferred', 'Transferida')}
                     </button>
                     <button
                       type="button"
@@ -569,7 +595,7 @@ export default function Dashboard() {
                       onClick={() => handleAplazarClase(c)}
                       className="py-1.5 px-2 rounded-lg text-xs font-medium border border-[var(--accent-color)] text-[var(--accent-color)] bg-transparent hover:bg-[var(--accent-color)]/10 active:scale-[0.98] transition-all disabled:opacity-50 text-center"
                     >
-                      {updatingClase === `${c.id}-Aplazada` ? '...' : 'Aplazada'}
+                      {updatingClase === `${c.id}-Aplazada` ? '...' : t('dashboard.statusPostponed', 'Aplazada')}
                     </button>
                     <button
                       type="button"
@@ -577,7 +603,7 @@ export default function Dashboard() {
                       onClick={() => handleCambiarEstado(c.id, 'Cancelada')}
                       className="py-1.5 px-2 rounded-lg text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 border border-transparent active:scale-[0.98] transition-all disabled:opacity-50 text-center truncate"
                     >
-                      {updatingClase === `${c.id}-Cancelada` ? '...' : 'Cancelada'}
+                      {updatingClase === `${c.id}-Cancelada` ? '...' : t('dashboard.statusCancelled', 'Cancelada')}
                     </button>
                   </div>
                 </div>
@@ -591,7 +617,7 @@ export default function Dashboard() {
       <section>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider">
-            Gráfica Histórica
+            {t('dashboard.historicalChart', 'Gráfica Histórica')}
           </h2>
           <div className="flex items-center gap-1">
             {[4, 6, 8, 12].map((n) => (
@@ -622,8 +648,8 @@ export default function Dashboard() {
               />
               <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(128,128,128,0.06)', radius: 6 }} />
               <Legend wrapperStyle={{ fontSize: '12px', color: '#a1a1aa' }} />
-              <Bar dataKey="Estimado" fill="var(--accent-color)"  radius={[4,4,0,0]} maxBarSize={40} />
-              <Bar dataKey="Cobrado"  fill="var(--accent-dark)"   radius={[4,4,0,0]} maxBarSize={40} opacity={0.75} />
+              <Bar dataKey="Estimado" name={t('dashboard.estimated', 'Estimado')} fill="var(--accent-color)"  radius={[4,4,0,0]} maxBarSize={40} />
+              <Bar dataKey="Cobrado"  name={t('dashboard.paid', 'Pagado')} fill="var(--accent-dark)"   radius={[4,4,0,0]} maxBarSize={40} opacity={0.75} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -632,7 +658,7 @@ export default function Dashboard() {
       {/* ── Tabla de grupos activos (V2) ── */}
       <section id="seccion-grupos">
         <h2 className="text-sm font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider mb-3">
-          Grupos Activos
+          {t('dashboard.activeGroups', 'Grupos Activos')}
         </h2>
         <div className="overflow-x-auto -mx-1 px-1">
           <Table

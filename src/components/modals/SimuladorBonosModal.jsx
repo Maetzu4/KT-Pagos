@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Modal } from '../ui/Modal';
 import { Sparkles, CheckCircle2, Trophy, RotateCcw, Zap } from 'lucide-react';
 import { useCountUp } from '../../hooks/useCountUp';
@@ -61,6 +62,7 @@ function DesgloseFila({ label, value, sub, highlight, icon: Icon }) {
 }
 
 export function SimuladorBonosModal({ open, onClose }) {
+  const { t } = useTranslation();
   const [montoInput, setMontoInput] = useState('10000');
   const [r1, setR1] = useState('none');
   const [r2, setR2] = useState('none');
@@ -90,12 +92,12 @@ export function SimuladorBonosModal({ open, onClose }) {
   };
 
   return (
-    <Modal open={open} onClose={onClose} title="Simulador Rápido de Bonos" size="lg" maxWidth="max-w-2xl">
+    <Modal open={open} onClose={onClose} title={t('bonuses.quickSimulatorTitle', 'Simulador Rápido de Bonos')} size="lg" maxWidth="max-w-2xl">
       <div className="space-y-6">
         {/* Descripción rápida */}
         <div className="flex items-center justify-between">
           <p className="text-xs text-zinc-500">
-            Calcula tu bono ingresando un monto estimado y ajustando los grados de retención.
+            {t('bonuses.quickSimulatorDesc', 'Calcula tu bono ingresando un monto estimado y ajustando los grados de retención.')}
           </p>
           <button
             type="button"
@@ -103,14 +105,14 @@ export function SimuladorBonosModal({ open, onClose }) {
             className="inline-flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 transition-colors shrink-0 ml-2 cursor-pointer"
           >
             <RotateCcw size={12} />
-            <span>Restablecer</span>
+            <span>{t('bonuses.reset', 'Restablecer')}</span>
           </button>
         </div>
 
         {/* Input Monto Base */}
         <div className="space-y-2">
           <label htmlFor="simulador-monto" className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wide">
-            Monto de Clases Regulares
+            {t('bonuses.regularClassesAmount', 'Monto de Clases Regulares')}
           </label>
           <div className="relative">
             <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-mono text-zinc-400 font-semibold pointer-events-none">
@@ -135,30 +137,30 @@ export function SimuladorBonosModal({ open, onClose }) {
             <div className="flex items-center gap-1.5">
               <Zap size={15} className="text-[var(--accent-color)]" />
               <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wide">
-                Retenciones
+                {t('bonuses.retentions', 'Retenciones')}
               </span>
             </div>
             <span className="text-xs font-bold text-[var(--accent-color)] font-mono">
-              +{(porcentajeAcumulado * 100).toFixed(0)}% de bono
+              {t('bonuses.retentionBonusPct', '+{{pct}}% de bono', { pct: (porcentajeAcumulado * 100).toFixed(0) })}
             </span>
           </div>
 
           <div className="space-y-2.5">
             <RetentionRow
-              label="Retención R1"
-              description="Evaluación del primer bloque"
+              label={t('bonuses.retentionR1', 'Retención R1')}
+              description={t('bonuses.r1Desc', 'Evaluación del primer bloque')}
               value={r1}
               onChange={setR1}
             />
             <RetentionRow
-              label="Retención R2"
-              description="Evaluación del segundo bloque"
+              label={t('bonuses.retentionR2', 'Retención R2')}
+              description={t('bonuses.r2Desc', 'Evaluación del segundo bloque')}
               value={r2}
               onChange={setR2}
             />
             <RetentionRow
-              label="Retención R3"
-              description="Evaluación del tercer bloque"
+              label={t('bonuses.retentionR3', 'Retención R3')}
+              description={t('bonuses.r3Desc', 'Evaluación del tercer bloque')}
               value={r3}
               onChange={setR3}
             />
@@ -170,19 +172,19 @@ export function SimuladorBonosModal({ open, onClose }) {
           <div className="flex items-center gap-2 pb-1 border-b border-zinc-200/50 dark:border-zinc-800/50">
             <Sparkles size={15} className="text-[var(--accent-color)]" />
             <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
-              Proyección Calculada
+              {t('bonuses.calculatedProjection', 'Proyección Calculada')}
             </h3>
           </div>
 
           <div className="divide-y divide-zinc-200/50 dark:divide-zinc-800/50">
             <DesgloseFila
               icon={CheckCircle2}
-              label="Monto Base"
+              label={t('bonuses.baseAmount', 'Monto Base')}
               value={formatCurrency(animMontoBase)}
             />
             <DesgloseFila
               icon={Trophy}
-              label="Bono Aplicado"
+              label={t('bonuses.appliedBonus', 'Bono Aplicado')}
               sub={`(${(porcentajeAcumulado * 100).toFixed(0)}%)`}
               value={animMontoBono > 0 ? `+${formatCurrency(animMontoBono)}` : formatCurrency(0)}
               highlight={montoBono > 0}
@@ -193,7 +195,7 @@ export function SimuladorBonosModal({ open, onClose }) {
           <div className="pt-2">
             <div className="flex items-center justify-between rounded-xl bg-[var(--accent-color)]/10 px-4 py-3">
               <span className="text-sm font-semibold text-[var(--accent-color)]">
-                Subtotal Regulares
+                {t('bonuses.subtotalRegulars', 'Subtotal Regulares')}
               </span>
               <span className="font-mono font-bold text-lg text-[var(--accent-color)]">
                 {formatCurrency(animSubtotalRegulares)}

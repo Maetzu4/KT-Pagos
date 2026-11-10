@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Modal } from '../ui/Modal';
 import { CheckCircle2, Zap, Trophy, RotateCcw, TrendingUp } from 'lucide-react';
 import { formatCurrency } from '../../lib/utils';
@@ -38,6 +39,7 @@ function Fila({ icon: Icon, label, value, sub, highlight, badge, muted }) {
 }
 
 export function DesgloseProyectadoModal({ open, onClose, periodo, clases }) {
+  const { t } = useTranslation();
   // ── 1. Hooks incondicionales al inicio ─────────────────────────────────────
   const listaClases = useMemo(() => {
     return (clases && clases.length > 0) ? clases : (periodo?.clases || []);
@@ -105,13 +107,13 @@ export function DesgloseProyectadoModal({ open, onClose, periodo, clases }) {
 
   if (!periodo && (!listaClases || listaClases.length === 0)) {
     return (
-      <Modal open={open} onClose={onClose} title="Desglose Proyectado">
+      <Modal open={open} onClose={onClose} title={t('finances.breakdownTitle', 'Desglose Proyectado')}>
         <div className="py-12 px-4 text-center">
           <p className="text-base font-semibold text-zinc-900 dark:text-white">
-            Aún no hay clases registradas para este periodo.
+            {t('finances.noClassesPeriod', 'Aún no hay clases registradas para este periodo.')}
           </p>
           <p className="text-xs sm:text-sm text-zinc-500 mt-1">
-            Completa o añade clases para generar tu reporte financiero.
+            {t('finances.noClassesPeriodDesc', 'Completa o añade clases para generar tu reporte financiero.')}
           </p>
         </div>
       </Modal>
@@ -119,14 +121,14 @@ export function DesgloseProyectadoModal({ open, onClose, periodo, clases }) {
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Desglose Proyectado">
+    <Modal open={open} onClose={onClose} title={t('finances.breakdownTitle', 'Desglose Proyectado')}>
       <div className="space-y-4">
         {/* ── Arriba: Proyectado Total del Mes ── */}
         <div className="rounded-2xl bg-zinc-50 dark:bg-zinc-800/40 p-4 sm:p-5 flex items-center justify-between">
           <div>
             <div className="flex items-center gap-2">
               <span className="text-xs uppercase tracking-wider font-semibold text-[var(--accent-color)]">
-                Proyectado Total del Mes
+                {t('finances.projectedMonthTotal', 'Proyectado Total del Mes')}
               </span>
               {periodo?.nombre_periodo && (
                 <span className="text-xs text-zinc-500 dark:text-zinc-400">
@@ -147,23 +149,23 @@ export function DesgloseProyectadoModal({ open, onClose, periodo, clases }) {
         <div className="rounded-2xl bg-zinc-50 dark:bg-zinc-800/40 divide-y divide-zinc-200/60 dark:divide-zinc-800/50 overflow-hidden px-4">
           <Fila
             icon={CheckCircle2}
-            label="Clases Regulares"
-            sub={`${cantRegulares} ${cantRegulares === 1 ? 'clase' : 'clases'}`}
+            label={t('finances.regularClasses', 'Clases Regulares')}
+            sub={`${cantRegulares} ${cantRegulares === 1 ? t('finances.singleClass', 'clase') : t('finances.multipleClasses', 'clases')}`}
             value={formatCurrency(montoRegulares)}
           />
           <Fila
             icon={Zap}
-            label="Clases Extras"
-            sub={`${cantExtras} ${cantExtras === 1 ? 'clase' : 'clases'}`}
+            label={t('finances.extraClasses', 'Clases Extras')}
+            sub={`${cantExtras} ${cantExtras === 1 ? t('finances.singleClass', 'clase') : t('finances.multipleClasses', 'clases')}`}
             value={formatCurrency(montoExtras)}
           />
           <Fila
             icon={Trophy}
-            label="Bono Aplicado"
+            label={t('finances.bonusApplied', 'Bono Aplicado')}
             badge={pctBono > 0 ? `+${pctBono}%` : null}
             sub={pctBono > 0
-              ? `${pctBono}% ganado sobre ingresos regulares`
-              : '0% · Sin bono este período'}
+              ? t('finances.bonusEarnedSub', '{{pct}}% ganado sobre ingresos regulares', { pct: pctBono })
+              : t('finances.noBonusPeriod', '0% · Sin bono este período')}
             value={montoBono > 0 ? `+${formatCurrency(montoBono)}` : formatCurrency(0)}
             highlight={montoBono > 0}
             muted={montoBono === 0}
@@ -171,8 +173,8 @@ export function DesgloseProyectadoModal({ open, onClose, periodo, clases }) {
           {deudaAnterior > 0 && (
             <Fila
               icon={RotateCcw}
-              label="Deuda Arrastrada"
-              sub="Saldo pendiente del período anterior"
+              label={t('finances.rolledOverDebt', 'Deuda Arrastrada')}
+              sub={t('finances.rolledOverDebtSub', 'Saldo pendiente del período anterior')}
               value={`+${formatCurrency(deudaAnterior)}`}
               highlight
             />
@@ -188,12 +190,12 @@ export function DesgloseProyectadoModal({ open, onClose, periodo, clases }) {
               </div>
               <div className="min-w-0">
                 <p className="text-xs font-semibold uppercase tracking-wider text-[var(--accent-color)] truncate">
-                  Total Ganado a la fecha
+                  {t('finances.totalEarnedToDate', 'Total Ganado a la fecha')}
                 </p>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
                   {validClases.length > 0
-                    ? `${cantCompletadas} de ${validClases.length} clases completadas`
-                    : `${cantCompletadas} clases completadas`}
+                    ? t('finances.completedRatio', '{{completed}} de {{total}} clases completadas', { completed: cantCompletadas, total: validClases.length })
+                    : t('finances.classesCompletedCount', '{{count}} clases completadas', { count: cantCompletadas })}
                 </p>
               </div>
             </div>
@@ -203,7 +205,7 @@ export function DesgloseProyectadoModal({ open, onClose, periodo, clases }) {
               </p>
               {totalProyectado > 0 && (
                 <p className="text-[11px] font-medium text-zinc-500 dark:text-zinc-400">
-                  {pctAvance}% del proyectado
+                  {t('finances.pctOfProjected', '{{pct}}% del proyectado', { pct: pctAvance })}
                 </p>
               )}
             </div>
@@ -221,7 +223,7 @@ export function DesgloseProyectadoModal({ open, onClose, periodo, clases }) {
         {/* Nota al pie */}
         {periodo?.nombre_periodo && (
           <p className="text-xs text-zinc-400 dark:text-zinc-500 text-center px-2">
-            {periodo.nombre_periodo} · Los montos excluyen clases Canceladas
+            {t('finances.breakdownFootnote', '{{period}} · Los montos excluyen clases Canceladas', { period: periodo.nombre_periodo })}
           </p>
         )}
       </div>

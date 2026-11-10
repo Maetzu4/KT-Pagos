@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Trophy, Gift, CheckCircle2,
   Sparkles, TrendingUp, Save, Info, Zap, Calculator,
@@ -97,6 +98,7 @@ function DesgloseFila({ label, value, sub, highlight, icon: Icon }) {
 
 // ─── Página Principal ────────────────────────────────────────────────────────
 export default function Bonos() {
+  const { t } = useTranslation();
   const { periodos = [], periodoActual = null, upsertPeriodo, loading: loadingPeriodos } = usePeriodos();
   const { clases = [], loading: loadingClases } = useClases();
   const { grupos = [] } = useGrupos();
@@ -298,8 +300,8 @@ export default function Bonos() {
             <Trophy size={20} className="text-[var(--accent-color)]" />
           </div>
           <div>
-            <h1 className="text-2xl font-semibold text-zinc-900 dark:text-white">Módulo de Bonos</h1>
-            <p className="text-sm text-zinc-500 mt-0.5">Gestiona tus retenciones y calcula el bono mensual</p>
+            <h1 className="text-2xl font-semibold text-zinc-900 dark:text-white">{t('bonuses.title', 'Módulo de Bonos')}</h1>
+            <p className="text-sm text-zinc-500 mt-0.5">{t('bonuses.subtitle', 'Gestiona tus retenciones y calcula el bono mensual')}</p>
           </div>
         </div>
 
@@ -309,7 +311,7 @@ export default function Bonos() {
           <div className="w-14 shrink-0 flex items-center justify-end">
             {isCurrentPeriod && (
               <span className="px-2 py-0.5 rounded-md bg-[var(--accent-color)]/10 text-[var(--accent-color)] text-[10px] font-bold uppercase tracking-wider animate-fade-in">
-                Actual
+                {t('bonuses.current', 'Actual')}
               </span>
             )}
           </div>
@@ -320,7 +322,7 @@ export default function Bonos() {
               value={selectedAnio}
               onChange={setSelectedAnio}
               options={aniosDisponibles}
-              placeholder="Año"
+              placeholder={t('bonuses.year', 'Año')}
               className="bg-zinc-100 dark:bg-zinc-800/50 border-0 rounded-xl font-medium focus:ring-2 focus:ring-[var(--accent-color)] text-xs sm:text-sm"
             />
           </div>
@@ -331,7 +333,7 @@ export default function Bonos() {
               value={selectedMes}
               onChange={setSelectedMes}
               options={mesesDisponibles}
-              placeholder="Mes"
+              placeholder={t('bonuses.month', 'Mes')}
               className="bg-zinc-100 dark:bg-zinc-800/50 border-0 rounded-xl font-medium focus:ring-2 focus:ring-[var(--accent-color)] text-xs sm:text-sm"
             />
           </div>
@@ -347,10 +349,10 @@ export default function Bonos() {
             <div className="px-5 py-4">
               <div className="flex items-center gap-2">
                 <Gift size={16} className="text-[var(--accent-color)]" />
-                <h2 className="font-semibold text-zinc-900 dark:text-white text-sm">Requisitos del Bono</h2>
+                <h2 className="font-semibold text-zinc-900 dark:text-white text-sm">{t('bonuses.bonusRequirements', 'Requisitos del Bono')}</h2>
               </div>
               <p className="text-xs text-zinc-500 mt-1">
-                Para activar el bono, debes cumplir todos los requisitos del mes
+                {t('bonuses.bonusRequirementsSub', 'Para activar el bono, debes cumplir todos los requisitos del mes')}
               </p>
             </div>
 
@@ -359,8 +361,10 @@ export default function Bonos() {
                 // For the first requirement (10 grupos activos), show actual live count
                 const isGruposReq = text.includes('10 grupos activos');
                 const displayText = isGruposReq
-                  ? `${gruposActivosNoIND.length} / 10 grupos activos (excluye IND)`
-                  : text;
+                  ? t('bonuses.activeGroupsReq', '{{count}} / 10 grupos activos (excluye IND)', { count: gruposActivosNoIND.length })
+                  : text.includes('15+')
+                    ? t('bonuses.studentsRetentionReq', '15+ alumnos en retención')
+                    : t('bonuses.metricsAboveOkReq', 'Métricas por encima de OK');
                 const metGruposReq = isGruposReq && gruposActivosNoIND.length >= 10;
 
                 return (
@@ -381,7 +385,7 @@ export default function Bonos() {
                     )}
                     {isGruposReq && !metGruposReq && gruposActivosNoIND.length > 0 && (
                       <span className="ml-auto text-[10px] font-semibold text-amber-500">
-                        Faltan {10 - gruposActivosNoIND.length}
+                        {t('bonuses.missingGroups', 'Faltan {{count}}', { count: 10 - gruposActivosNoIND.length })}
                       </span>
                     )}
                   </div>
@@ -393,12 +397,12 @@ export default function Bonos() {
               <label className="flex items-center justify-between cursor-pointer gap-4">
                 <div>
                   <p className="text-sm font-semibold text-zinc-900 dark:text-white">
-                    Cumplo con todos los requisitos de este mes
+                    {t('bonuses.meetAllRequirements', 'Cumplo con todos los requisitos de este mes')}
                   </p>
                   <p className="text-xs text-zinc-500 mt-0.5">
                     {formState.requisitos_bono
-                      ? 'Bono activado — configura tus retenciones abajo'
-                      : 'Activa el switch para habilitar el módulo de retenciones'}
+                      ? t('bonuses.bonusActivatedSub', 'Bono activado — configura tus retenciones abajo')
+                      : t('bonuses.bonusDeactivatedSub', 'Activa el switch para habilitar el módulo de retenciones')}
                   </p>
                 </div>
                 <Toggle
@@ -424,17 +428,17 @@ export default function Bonos() {
             <div className="px-5 py-4">
               <div className="flex items-center gap-2">
                 <Zap size={16} className="text-[var(--accent-color)]" />
-                <h2 className="font-semibold text-zinc-900 dark:text-white text-sm">Gestor de Retenciones</h2>
+                <h2 className="font-semibold text-zinc-900 dark:text-white text-sm">{t('bonuses.retentionManager', 'Gestor de Retenciones')}</h2>
               </div>
               <p className="text-xs text-zinc-500 mt-1">
-                Evalúa el desempeño de cada retención para calcular el % de bono acumulado
+                {t('bonuses.retentionManagerSub', 'Evalúa el desempeño de cada retención para calcular el % de bono acumulado')}
               </p>
             </div>
 
             <div className="px-5 pb-5 grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <SegmentedGrade label="Retención R1" value={formState.r1_grado} onChange={(v) => setFormState((s) => ({ ...s, r1_grado: v }))} disabled={!formState.requisitos_bono} />
-              <SegmentedGrade label="Retención R2" value={formState.r2_grado} onChange={(v) => setFormState((s) => ({ ...s, r2_grado: v }))} disabled={!formState.requisitos_bono} />
-              <SegmentedGrade label="Retención R3" value={formState.r3_grado} onChange={(v) => setFormState((s) => ({ ...s, r3_grado: v }))} disabled={!formState.requisitos_bono} />
+              <SegmentedGrade label={t('bonuses.retentionR1', 'Retención R1')} value={formState.r1_grado} onChange={(v) => setFormState((s) => ({ ...s, r1_grado: v }))} disabled={!formState.requisitos_bono} />
+              <SegmentedGrade label={t('bonuses.retentionR2', 'Retención R2')} value={formState.r2_grado} onChange={(v) => setFormState((s) => ({ ...s, r2_grado: v }))} disabled={!formState.requisitos_bono} />
+              <SegmentedGrade label={t('bonuses.retentionR3', 'Retención R3')} value={formState.r3_grado} onChange={(v) => setFormState((s) => ({ ...s, r3_grado: v }))} disabled={!formState.requisitos_bono} />
             </div>
 
             {formState.requisitos_bono && (
@@ -442,7 +446,7 @@ export default function Bonos() {
                 <div className="rounded-xl bg-zinc-100/80 dark:bg-zinc-800/60 px-4 py-3 flex items-center gap-4">
                   <div className="flex-1">
                     <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-xs text-zinc-500">% de Bono Acumulado</span>
+                      <span className="text-xs text-zinc-500">{t('bonuses.pctAccumulatedBonus', '% de Bono Acumulado')}</span>
                       <span className="text-xs font-bold text-[var(--accent-color)]">
                         {(porcentaje_acumulado * 100).toFixed(0)}%
                       </span>
@@ -456,7 +460,7 @@ export default function Bonos() {
                   </div>
                   {/* Animación de conteo para 'Bono extra' junto a la barra de progreso */}
                   <div className="text-right shrink-0">
-                    <p className="text-xs text-zinc-500">Bono extra</p>
+                    <p className="text-xs text-zinc-500">{t('bonuses.extraBonus', 'Bono extra')}</p>
                     <p className="text-sm font-bold font-mono text-[var(--accent-color)]">
                       +{formatCurrency(animBono)}
                     </p>
@@ -474,18 +478,18 @@ export default function Bonos() {
             <div className="bg-[var(--accent-color)] px-5 py-4">
               <div className="flex items-center gap-2 mb-1">
                 <Sparkles size={16} className="text-white/80" />
-                <span className="text-xs font-semibold text-white/80 uppercase tracking-wide">Calculadora de Bono</span>
+                <span className="text-xs font-semibold text-white/80 uppercase tracking-wide">{t('bonuses.bonusCalculator', 'Calculadora de Bono')}</span>
               </div>
               <p className="text-2xl font-bold text-white font-mono">{formatCurrency(animTotalPreview)}</p>
-              <p className="text-xs text-white/70 mt-0.5">{periodo?.nombre_periodo ?? '—'} · Total proyectado</p>
+              <p className="text-xs text-white/70 mt-0.5">{periodo?.nombre_periodo ?? '—'} · {t('bonuses.totalProjected', 'Total proyectado')}</p>
             </div>
 
             {/* Desglose con animaciones de conteo */}
             <div className="px-5 py-1 divide-y divide-zinc-200/50 dark:divide-zinc-800/50">
-              <DesgloseFila label="Clases Regulares" value={formatCurrency(animRegulares)} icon={CheckCircle2} />
-              <DesgloseFila label="Clases Extras" value={formatCurrency(animExtras)} icon={Zap} />
+              <DesgloseFila label={t('bonuses.regularClasses', 'Clases Regulares')} value={formatCurrency(animRegulares)} icon={CheckCircle2} />
+              <DesgloseFila label={t('bonuses.extraClasses', 'Clases Extras')} value={formatCurrency(animExtras)} icon={Zap} />
               <DesgloseFila
-                label="Bono Aplicado"
+                label={t('bonuses.appliedBonus', 'Bono Aplicado')}
                 sub={porcentaje_acumulado > 0 ? `(${(porcentaje_acumulado * 100).toFixed(0)}%)` : undefined}
                 value={animBono > 0 ? `+${formatCurrency(animBono)}` : formatCurrency(0)}
                 icon={Trophy}
@@ -498,7 +502,7 @@ export default function Bonos() {
             {/* Subtotal Regulares (con Bono) desglosado en la parte inferior animado */}
             <div className="px-5 pt-2 pb-1">
               <div className="flex items-center justify-between rounded-xl bg-[var(--accent-color)]/10 px-4 py-3">
-                <span className="text-sm font-semibold text-[var(--accent-color)]">Subtotal Regulares</span>
+                <span className="text-sm font-semibold text-[var(--accent-color)]">{t('bonuses.subtotalRegulars', 'Subtotal Regulares')}</span>
                 <span className="font-mono font-bold text-lg text-[var(--accent-color)]">
                   {formatCurrency(animSubtotalRegulares)}
                 </span>
@@ -510,8 +514,8 @@ export default function Bonos() {
                 <Info size={13} className="shrink-0 mt-0.5 text-zinc-400" />
                 <p className="text-xs text-zinc-500 leading-relaxed">
                   {formState.requisitos_bono
-                    ? 'El bono se calcula sobre los ingresos regulares (no aplica a extras).'
-                    : 'Activa el toggle de requisitos para habilitar el bono mensual.'}
+                    ? t('bonuses.bonusCalcHintActive', 'El bono se calcula sobre los ingresos regulares (no aplica a extras).')
+                    : t('bonuses.bonusCalcHintInactive', 'Activa el toggle de requisitos para habilitar el bono mensual.')}
                 </p>
               </div>
 
@@ -521,10 +525,10 @@ export default function Bonos() {
                 className={'w-full justify-center transition-all duration-300 ' + (savedOk ? 'bg-emerald-500 hover:bg-emerald-500' : '')}
               >
                 {saving
-                  ? <><div className="w-4 h-4 border-2 border-white/60 border-t-white rounded-full animate-spin mr-2" />Guardando…</>
+                  ? <><div className="w-4 h-4 border-2 border-white/60 border-t-white rounded-full animate-spin mr-2" />{t('bonuses.saving', 'Guardando…')}</>
                   : savedOk
-                    ? <><CheckCircle2 size={16} className="mr-2" />¡Guardado!</>
-                    : <><Save size={16} className="mr-2" />Guardar Bonos</>
+                    ? <><CheckCircle2 size={16} className="mr-2" />{t('bonuses.saved', '¡Guardado!')}</>
+                    : <><Save size={16} className="mr-2" />{t('bonuses.saveBonuses', 'Guardar Bonos')}</>
                 }
               </Button>
 
@@ -536,7 +540,7 @@ export default function Bonos() {
                 className="w-full justify-center text-xs rounded-xl"
               >
                 <Calculator size={14} className="text-[var(--accent-color)] mr-1.5" />
-                Simulador Rápido
+                {t('bonuses.quickSimulator', 'Simulador Rápido')}
               </Button>
             </div>
           </div>
