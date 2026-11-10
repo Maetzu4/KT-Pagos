@@ -4,6 +4,7 @@ import { ThemeProvider } from './context/ThemeContext';
 import { Navbar } from './components/ui/Navbar';
 import { OnboardingModal } from './components/ui/OnboardingModal';
 import { useAuth } from './hooks/useAuth';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import Dashboard from './pages/Dashboard';
 import Grupos from './pages/Grupos';
 import Finanzas from './pages/Finanzas';
@@ -67,15 +68,17 @@ export default function App() {
           <Route
             path="/*"
             element={
-              <Layout key={layoutKey}>
-                <Routes>
-                  <Route path="/" element={<Dashboard />} />
-                  <Route path="/grupos" element={<Grupos />} />
-                  <Route path="/finanzas" element={<Finanzas />} />
-                  <Route path="/bonos" element={<Bonos />} />
-                  <Route path="/configuracion" element={<Configuracion />} />
-                </Routes>
-              </Layout>
+              <ErrorBoundary>
+                <Layout key={layoutKey}>
+                  <Routes>
+                    <Route path="/" element={<ErrorBoundary><Dashboard /></ErrorBoundary>} />
+                    <Route path="/grupos" element={<ErrorBoundary><Grupos /></ErrorBoundary>} />
+                    <Route path="/finanzas" element={<ErrorBoundary><Finanzas /></ErrorBoundary>} />
+                    <Route path="/bonos" element={<ErrorBoundary><Bonos /></ErrorBoundary>} />
+                    <Route path="/configuracion" element={<ErrorBoundary><Configuracion /></ErrorBoundary>} />
+                  </Routes>
+                </Layout>
+              </ErrorBoundary>
             }
           />
         </Routes>

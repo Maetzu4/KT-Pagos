@@ -82,33 +82,36 @@ export default function Clases() {
   ];
 
   const columns = [
-    { key: 'fecha_clase',  header: t('clases.date', 'Fecha'),   render: (r) => formatDate(r.fecha_clase) },
+    { key: 'fecha_clase',  header: t('clases.date', 'Fecha'),   render: (r) => formatDate(r?.fecha_clase) },
     {
       key: 'grupo',
       header: t('clases.group', 'Grupo'),
-      render: (r) => r.es_externa
-        ? <span className="font-medium text-zinc-900 dark:text-white flex items-center gap-1.5">{r.descripcion_externa || t('clases.external', 'Externa')}<span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-500 ring-1 ring-inset ring-sky-500/20">EXT</span></span>
-        : (r.grupos?.nombre_grupo ?? '—')
+      render: (r) => r?.es_externa
+        ? <span className="font-medium text-zinc-900 dark:text-white flex items-center gap-1.5">{r?.descripcion_externa || t('clases.external', 'Externa')}<span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-500 ring-1 ring-inset ring-sky-500/20">EXT</span></span>
+        : (r?.grupos?.nombre_grupo ?? '—')
     },
-    { key: 'nombre_clase', header: t('clases.class', 'Clase'),   render: (r) => r.nombre_clase || r.tema_clase || '—' },
+    { key: 'nombre_clase', header: t('clases.class', 'Clase'),   render: (r) => r?.nombre_clase || r?.tema_clase || '—' },
     {
       key: 'periodo',
       header: t('clases.period', 'Periodo'),
-      render: (r) => <span className="text-zinc-400 text-xs">{getNombrePeriodoClase(r.fecha_clase)}</span>,
+      render: (r) => <span className="text-zinc-400 text-xs">{getNombrePeriodoClase(r?.fecha_clase)}</span>,
     },
     {
       key: 'es_adicional',
       header: t('clases.type', 'Tipo'),
-      render: (r) => (r.es_adicional ?? r.es_extra)
+      render: (r) => (r?.es_adicional ?? r?.es_extra)
         ? <Badge variant="extra">{t('clases.extra', 'Extra')}</Badge>
         : <Badge variant="default">{t('clases.regular', 'Regular')}</Badge>,
     },
     {
       key: 'precio_cobrado',
       header: t('clases.price', 'Precio'),
-      render: (r) => (
-        <span className="font-mono text-xs">{formatCurrency(r.precio_cobrado)}</span>
-      ),
+      render: (r) => {
+        const precio = r?.precio_cobrado ?? (r?.es_externa ? r?.tarifas?.precio_regular : r?.grupos?.tarifas?.precio_regular) ?? 0;
+        return (
+          <span className="font-mono text-xs">{formatCurrency(precio)}</span>
+        );
+      },
     },
     {
       key: 'en_reclamo',
@@ -116,12 +119,12 @@ export default function Clases() {
       cellClassName: 'text-center w-10',
       render: (r) => (
         <button
-          onClick={(e) => { e.stopPropagation(); toggleReclamo(r.id); }}
-          title={r.en_reclamo ? t('clases.inClaimTooltip', 'En reclamo — clic para quitar') : t('clases.markClaimTooltip', 'Marcar en reclamo')}
+          onClick={(e) => { e.stopPropagation(); toggleReclamo(r?.id); }}
+          title={r?.en_reclamo ? t('clases.inClaimTooltip', 'En reclamo — clic para quitar') : t('clases.markClaimTooltip', 'Marcar en reclamo')}
           className={`flex items-center justify-center transition-all hover:scale-110 ${
-            r.en_reclamo ? 'text-[var(--accent-color)] opacity-100' : 'text-zinc-400 opacity-30 hover:opacity-70'
+            r?.en_reclamo ? 'text-[var(--accent-color)] opacity-100' : 'text-zinc-400 opacity-30 hover:opacity-70'
           }`}
-          aria-label={r.en_reclamo ? t('clases.inClaimTooltip', 'Quitar reclamo') : t('clases.markClaimTooltip', 'Marcar en reclamo')}
+          aria-label={r?.en_reclamo ? t('clases.inClaimTooltip', 'Quitar reclamo') : t('clases.markClaimTooltip', 'Marcar en reclamo')}
         >
           <AlertTriangle size={15} />
         </button>

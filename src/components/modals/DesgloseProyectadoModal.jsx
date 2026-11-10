@@ -7,7 +7,9 @@ import { formatCurrency } from '../../lib/utils';
 /** Precio efectivo de una clase (excluye Canceladas) */
 const getPrecioClase = (c) => {
   if (c?.estado_clase === 'Cancelada') return 0;
-  return Number(c?.precio_cobrado ?? c?.grupos?.tarifas?.precio_regular ?? 0);
+  if (c?.precio_cobrado != null) return Number(c.precio_cobrado);
+  if (c?.es_externa) return Number(c?.tarifas?.precio_regular ?? 0);
+  return Number(c?.grupos?.tarifas?.precio_regular ?? 0);
 };
 
 function Fila({ icon: Icon, label, value, sub, highlight, badge, muted }) {

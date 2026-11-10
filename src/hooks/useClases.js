@@ -35,6 +35,12 @@ const SELECT_CLASES_OPTIMIZADO = `
       precio_extra,
       duracion_minutos
     )
+  ),
+  tarifas (
+    id,
+    precio_regular,
+    precio_extra,
+    duracion_minutos
   )
 `;
 

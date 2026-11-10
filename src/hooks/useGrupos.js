@@ -17,7 +17,13 @@ const SELECT_GRUPOS = `
   id_externo, fecha_inicio_grupo, horario,
   link_bo, curso_codigo, curso_nombre,
   duracion_minutos, lecciones_totales,
-  tarifa_id, user_id, leccion_inicio_cobro
+  tarifa_id, user_id, leccion_inicio_cobro,
+  tarifas (
+    id,
+    precio_regular,
+    precio_extra,
+    duracion_minutos
+  )
 `;
 
 export function useGrupos() {
@@ -34,11 +40,16 @@ export function useGrupos() {
       setLoading(true);
       setError(null);
       try {
-        const data = await localDb.grupos
-          .where('user_id')
-          .equals(currentUserId)
-          .toArray();
-        data.sort((a, b) => (a.nombre_grupo ?? '').localeCompare(b.nombre_grupo ?? ''));
+        const [rawGrupos, rawTarifas] = await Promise.all([
+          localDb.grupos.where('user_id').equals(currentUserId).toArray(),
+          localDb.tarifas.where('user_id').equals(currentUserId).toArray(),
+        ]);
+        const tarifasMap = new Map((rawTarifas || []).map((t) => [t.id, t]));
+        const data = (rawGrupos || []).map((g) => ({
+          ...g,
+          tarifas: tarifasMap.get(g?.tarifa_id) || null,
+        }));
+        data.sort((a, b) => (a?.nombre_grupo ?? '').localeCompare(b?.nombre_grupo ?? ''));
         setGrupos(data);
       } catch (e) {
         setError(e.message);
@@ -441,7 +452,7 @@ export function useGrupos() {
     });
   };
 
-  const gruposActivos = grupos.filter((g) => g.estado === 'activo');
+  const gruposActivos = (grupos || []).filter((g) => g?.estado === 'activo');
 
   return { grupos, gruposActivos, loading, error, refetch: fetchGrupos, createGrupo, updateGrupo, deleteGrupo };
 }

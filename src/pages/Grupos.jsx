@@ -27,26 +27,30 @@ export default function Grupos() {
   const [showGestionExtras,  setShowGestionExtras]  = useState(false);
   const [toastWarning,       setToastWarning]       = useState(null);
 
-  const gruposFiltrados = grupos
+  const gruposFiltrados = (grupos || [])
     .filter((g) => {
       if (!search.trim()) return true;
       const q = search.trim().toLowerCase();
-      const nombre = (g.nombre_grupo ?? '').toLowerCase();
-      const idExterno = (g.id_externo ?? '').toLowerCase();
-      const horario = (g.horario ?? '').toLowerCase();
-      const estado = (g.estado ?? '').toLowerCase();
+      const nombre = (g?.nombre_grupo ?? '').toLowerCase();
+      const idExterno = (g?.id_externo ?? '').toLowerCase();
+      const horario = (g?.horario ?? '').toLowerCase();
+      const estado = (g?.estado ?? '').toLowerCase();
+      const cursoCodigo = (g?.curso_codigo ?? '').toLowerCase();
+      const cursoNombre = (g?.curso_nombre ?? '').toLowerCase();
 
       return (
         nombre.includes(q) ||
         idExterno.includes(q) ||
         horario.includes(q) ||
-        estado.includes(q)
+        estado.includes(q) ||
+        cursoCodigo.includes(q) ||
+        cursoNombre.includes(q)
       );
     })
     .slice()
     .sort((a, b) => {
-      const fa = a.fecha_inicio_grupo ?? '';
-      const fb = b.fecha_inicio_grupo ?? '';
+      const fa = a?.fecha_inicio_grupo ?? '';
+      const fb = b?.fecha_inicio_grupo ?? '';
       return fa.localeCompare(fb);
     });
 
@@ -83,8 +87,8 @@ export default function Grupos() {
       header: t('grupos.group', 'Grupo'),
       render: (r) => (
         <div className="flex items-center gap-2">
-          <span className="font-medium text-zinc-900 dark:text-white">{r.nombre_grupo ?? '—'}</span>
-          {r.id_externo?.includes('PRM') && (
+          <span className="font-medium text-zinc-900 dark:text-white">{r?.nombre_grupo ?? '—'}</span>
+          {r?.id_externo?.includes('PRM') && (
             <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold border border-[var(--accent-color)] text-[var(--accent-color)] bg-[var(--accent-color)]/10">
               PRM
             </span>
@@ -95,29 +99,42 @@ export default function Grupos() {
     {
       key: 'horario',
       header: t('grupos.schedule', 'Horario'),
-      render: (r) => r.horario ?? <span className="text-zinc-400 italic">—</span>,
+      render: (r) => r?.horario ?? <span className="text-zinc-400 italic">—</span>,
     },
     {
       key: 'estado',
       header: t('grupos.status', 'Estado'),
       render: (r) => (
-        <Badge variant={r.estado}>
-          {r.estado === 'activo' ? t('grupos.active', 'Activo')
-            : r.estado === 'finalizado' ? t('grupos.finished', 'Finalizado')
-            : r.estado === 'archivado' ? t('grupos.archived', 'Archivado')
-            : r.estado ?? '—'}
+        <Badge variant={r?.estado}>
+          {r?.estado === 'activo' ? t('grupos.active', 'Activo')
+            : r?.estado === 'finalizado' ? t('grupos.finished', 'Finalizado')
+            : r?.estado === 'archivado' ? t('grupos.archived', 'Archivado')
+            : r?.estado ?? '—'}
         </Badge>
       ),
     },
     {
       key: 'lecciones_totales',
       header: t('grupos.lessons', 'Lecciones'),
-      render: (r) => r.lecciones_totales ?? <span className="text-zinc-400 italic">—</span>,
+      render: (r) => r?.lecciones_totales ?? <span className="text-zinc-400 italic">—</span>,
+    },
+    {
+      key: 'tarifa',
+      header: t('grupos.rate', 'Tarifa'),
+      render: (r) => {
+        const precio = r?.tarifas?.precio_regular || 0;
+        const duracion = r?.tarifas?.duracion_minutos || r?.duracion_minutos || 'N/A';
+        return (
+          <span className="text-zinc-600 dark:text-zinc-400 text-xs">
+            {precio > 0 ? `$${precio}` : '—'} {duracion !== 'N/A' ? `(${duracion}m)` : ''}
+          </span>
+        );
+      },
     },
     {
       key: 'link_bo',
       header: t('grupos.link', 'Enlace'),
-      render: (r) => r.link_bo
+      render: (r) => r?.link_bo
         ? (
           <a
             href={r.link_bo}
@@ -143,8 +160,8 @@ export default function Grupos() {
           <Button
             size="icon"
             variant="danger"
-            loading={deleting === r.id}
-            onClick={() => setConfirmId(r.id)}
+            loading={deleting === r?.id}
+            onClick={() => setConfirmId(r?.id)}
             aria-label={t('clases.delete', 'Eliminar')}
           >
             <Trash2 size={14} />
@@ -161,7 +178,7 @@ export default function Grupos() {
         <div className="hidden md:block">
           <h1 className="text-2xl font-semibold text-zinc-900 dark:text-white">{t('grupos.title', 'Grupos')}</h1>
           <p className="text-sm text-zinc-500 mt-1">
-            {t('grupos.subtitle', '{{filtered}} de {{total}} grupos', { filtered: gruposFiltrados.length, total: grupos.length })}
+            {t('grupos.subtitle', '{{filtered}} de {{total}} grupos', { filtered: gruposFiltrados.length, total: (grupos || []).length })}
           </p>
         </div>
 
@@ -179,7 +196,7 @@ export default function Grupos() {
             />
             {/* Contador flotante a la derecha dentro del input */}
             <span className="text-[10px] text-zinc-400 dark:text-zinc-500 absolute right-3 top-2.5 tabular-nums pointer-events-none font-medium">
-              {gruposFiltrados.length}/{grupos.length}
+              {gruposFiltrados.length}/{(grupos || []).length}
             </span>
           </div>
 

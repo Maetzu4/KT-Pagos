@@ -9,10 +9,17 @@ let periodosCache = null;
 let periodosCacheTime = 0;
 const CACHE_TTL_MS = 60000; // 1 minuto de validez
 
-/** Obtiene el precio efectivo de una clase V2 */
+/** Obtiene el precio efectivo de una clase V2
+ * Para clases externas (es_externa=true, grupo_id=null) usa c.tarifas directamente.
+ * Para clases regulares usa c.grupos?.tarifas con encadenamiento seguro.
+ */
 export const getPrecioClase = (c) => {
   if (c?.estado_clase === 'Cancelada') return 0;
-  return Number(c?.precio_cobrado ?? c?.grupos?.tarifas?.precio_regular ?? 0);
+  if (c?.precio_cobrado != null) return Number(c.precio_cobrado);
+  // Clases externas: tarifa directa de la clase (FK tarifa_id → tarifas)
+  if (c?.es_externa) return Number(c?.tarifas?.precio_regular ?? 0);
+  // Clases regulares: tarifa del grupo
+  return Number(c?.grupos?.tarifas?.precio_regular ?? 0);
 };
 
 /**
@@ -257,7 +264,10 @@ export function usePeriodos() {
             precio_cobrado: c.precio_cobrado,
             en_reclamo: c.en_reclamo,
             es_adicional: c.es_adicional,
-            grupos: gruposMap.get(c.grupo_id) || null,
+            es_externa: Boolean(c.es_externa),
+            tarifa_id: c.tarifa_id ?? null,
+            grupos: c.grupo_id ? (gruposMap.get(c.grupo_id) || null) : null,
+            tarifas: c.tarifa_id ? (tarifasMap.get(c.tarifa_id) || null) : null,
           }))
           .sort((a, b) => (b.fecha_clase ?? '').localeCompare(a.fecha_clase ?? ''));
 
@@ -313,10 +323,15 @@ export function usePeriodos() {
             precio_cobrado,
             en_reclamo,
             es_adicional,
+            es_externa,
+            tarifa_id,
             grupos (
               tarifas (
                 precio_regular
               )
+            ),
+            tarifas (
+              precio_regular
             )
           `)
           .eq('user_id', onlineUser.id)

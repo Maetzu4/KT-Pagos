@@ -28,11 +28,14 @@ import { nombrePeriodo } from '../lib/dateUtils';
 
 /**
  * Precio efectivo de una clase.
- * Si precio_cobrado está seteado lo usa; si no, cae al precio_regular de la tarifa del grupo.
+ * Para clases externas (es_externa=true) usa c.tarifas directamente.
+ * Para clases regulares usa c.grupos?.tarifas con encadenamiento seguro.
  */
 const getPrecio = (c) => {
   if (c?.estado_clase === 'Cancelada') return 0;
-  return Number(c?.precio_cobrado ?? c?.grupos?.tarifas?.precio_regular ?? 0);
+  if (c?.precio_cobrado != null) return Number(c.precio_cobrado);
+  if (c?.es_externa) return Number(c?.tarifas?.precio_regular ?? 0);
+  return Number(c?.grupos?.tarifas?.precio_regular ?? 0);
 };
 
 /** Formatea 'YYYY-MM-DD' → 'DD/MM/YYYY' */
@@ -71,15 +74,16 @@ function getHoraClase(c, grupo) {
   try {
     if (!c && !grupo) return null;
 
-    if (c?.fecha_clase) {
-      if (c.fecha_clase.includes('T')) {
-        const timePart = c.fecha_clase.split('T')[1];
+    const fechaStr = typeof c?.fecha_clase === 'string' ? c.fecha_clase : '';
+    if (fechaStr) {
+      if (fechaStr.includes('T')) {
+        const timePart = fechaStr.split('T')[1];
         if (timePart && timePart.length >= 5) {
           const hhmm = timePart.slice(0, 5);
           if (hhmm !== '00:00') return hhmm;
         }
-      } else if (c.fecha_clase.includes(' ')) {
-        const timePart = c.fecha_clase.split(' ')[1];
+      } else if (fechaStr.includes(' ')) {
+        const timePart = fechaStr.split(' ')[1];
         if (timePart && timePart.length >= 5) {
           const hhmm = timePart.slice(0, 5);
           if (hhmm !== '00:00') return hhmm;
@@ -157,8 +161,9 @@ export default function Dashboard() {
 
   const clasesFiltradas = useMemo(() => {
     if (!clasesMes || !keyPeriodoActivo) return [];
-    return clasesMes.filter((c) => {
-      if (c.estado_clase === 'Transferida') return false;
+    return (clasesMes || []).filter((c) => {
+      if (!c) return false;
+      if ((c.estado_clase ?? '') === 'Transferida') return false;
       const fecha = (c.fecha_clase ?? '').split('T')[0].split(' ')[0];
       return fecha.startsWith(keyPeriodoActivo);
     });
@@ -193,10 +198,14 @@ export default function Dashboard() {
 
   const hoyStr = new Date().toISOString().split('T')[0];
   const pendientes = useMemo(() => {
-    return clasesFiltradas
-      .filter((c) => c.fecha_clase <= hoyStr && (c.estado_clase === 'Programada' || c.estado_clase === 'Aplazada'))
+    return (clasesFiltradas || [])
+      .filter((c) => {
+        if (!c) return false;
+        const fecha = c.fecha_clase ?? '';
+        return fecha <= hoyStr && (c.estado_clase === 'Programada' || c.estado_clase === 'Aplazada');
+      })
       .slice()
-      .sort((a, b) => (a.fecha_clase ?? '').localeCompare(b.fecha_clase ?? ''));
+      .sort((a, b) => (a?.fecha_clase ?? '').localeCompare(b?.fecha_clase ?? ''));
   }, [clasesFiltradas, hoyStr]);
 
   const [updatingClase, setUpdatingClase] = useState(null);
@@ -332,8 +341,8 @@ export default function Dashboard() {
       header: 'Grupo',
       render: (r) => (
         <div className="flex items-center gap-2">
-          <span className="font-medium text-zinc-900 dark:text-white">{r.nombre_grupo ?? '—'}</span>
-          {r.id_externo?.includes('PRM') && (
+          <span className="font-medium text-zinc-900 dark:text-white">{r?.nombre_grupo ?? '—'}</span>
+          {r?.id_externo?.includes('PRM') && (
             <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold border border-[var(--accent-color)] text-[var(--accent-color)] bg-[var(--accent-color)]/10">
               PRM
             </span>
@@ -346,7 +355,7 @@ export default function Dashboard() {
       header: 'Curso',
       render: (r) => (
         <span className="text-zinc-600 dark:text-zinc-400 text-sm truncate max-w-[160px] block">
-          {r.curso_nombre ?? <span className="italic text-zinc-400">—</span>}
+          {r?.curso_nombre ?? r?.curso_codigo ?? <span className="italic text-zinc-400">—</span>}
         </span>
       ),
     },
@@ -355,7 +364,7 @@ export default function Dashboard() {
       header: 'Horario',
       render: (r) => (
         <span className="text-zinc-500 text-sm">
-          {r.horario ?? <span className="italic text-zinc-400">—</span>}
+          {r?.horario ?? <span className="italic text-zinc-400">—</span>}
         </span>
       ),
     },
@@ -363,7 +372,7 @@ export default function Dashboard() {
       key: 'progreso',
       header: 'Progreso (mes)',
       render: (r) => {
-        const p = progresoByGrupo[r.id];
+        const p = r?.id ? progresoByGrupo[r.id] : null;
         if (!p) return <span className="text-zinc-400 italic text-xs">Sin clases</span>;
         const pct = p.total > 0 ? Math.round((p.completadas / p.total) * 100) : 0;
         return (
@@ -480,8 +489,8 @@ export default function Dashboard() {
           label={t('dashboard.activeGroups', 'Grupos Activos')}
           value={Math.round(animGruposActivos)}
           sub={t('dashboard.ofTotalGroups', {
-            total: grupos.length,
-            defaultValue: `de ${grupos.length} grupos totales`
+            total: (grupos || []).length,
+            defaultValue: `de ${(grupos || []).length} grupos totales`
           })}
           icon={Users}
           onClick={() => {
@@ -522,51 +531,61 @@ export default function Dashboard() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {pendientes.map((c) => {
-              const grupo = grupos.find((g) => String(g.id) === String(c.grupo_id)) || c.grupos;
+              const grupo = (grupos || []).find((g) => String(g?.id) === String(c?.grupo_id)) || c?.grupos;
               // Clases externas usan descripcion_externa; internas buscan el grupo con fallbacks seguros
-              const esExterna = Boolean(c.es_externa);
+              const esExterna = Boolean(c?.es_externa);
               const nombreGrupo = esExterna
-                ? (c.descripcion_externa || t('dashboard.externalClass', 'Clase Externa'))
-                : (grupo?.nombre_grupo ?? c.grupos?.nombre_grupo ?? t('dashboard.unknownGroup', 'Grupo desconocido'));
-              const tema = c.tema_clase ?? c.nombre_clase ?? t('dashboard.scheduledClass', 'Clase programada');
-              const esAtrasada = c.fecha_clase < hoyStr;
+                ? (c?.descripcion_externa || t('dashboard.externalClass', 'Clase Externa'))
+                : (grupo?.nombre_grupo ?? c?.grupos?.nombre_grupo ?? t('dashboard.unknownGroup', 'Grupo desconocido'));
+              const cursoCodigo = esExterna
+                ? 'EXT'
+                : (c?.grupos?.curso_codigo || grupo?.curso_codigo || 'N/A');
+              const tema = c?.tema_clase ?? c?.nombre_clase ?? t('dashboard.scheduledClass', 'Clase programada');
+              const esAtrasada = c?.fecha_clase < hoyStr;
               const hora = getHoraClase(c, grupo);
 
               return (
                 <div
-                  key={c.id}
+                  key={c?.id}
                   className="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm hover:border-[var(--accent-color)]/40 transition-colors flex flex-col justify-between gap-3"
                 >
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                       <span className="text-xs tabular-nums text-zinc-500 dark:text-zinc-400 font-medium">
-                        {fmtFechaConDia(c.fecha_clase)}
+                        {fmtFechaConDia(c?.fecha_clase)}
                         {hora && <span> · {hora}</span>}
                       </span>
-                      {c.estado_clase === 'Aplazada' && (
+                      {c?.estado_clase === 'Aplazada' && (
                         <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[var(--accent-color)]/10 text-[var(--accent-color)]">
                           {t('dashboard.badgePostponed', 'APLAZADA')}
                         </span>
                       )}
-                      {esAtrasada && c.estado_clase !== 'Aplazada' && (
+                      {esAtrasada && c?.estado_clase !== 'Aplazada' && (
                         <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[var(--accent-color)]/10 text-[var(--accent-color)]">
                           {t('dashboard.badgeOverdue', 'Atrasada')}
                         </span>
                       )}
-                      {c.es_adicional && (
+                      {c?.es_adicional && (
                         <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[var(--accent-color)]/10 text-[var(--accent-color)] ring-1 ring-inset ring-[var(--accent-color)]/20">
                           {t('dashboard.badgeExtra', 'EXTRA')}
                         </span>
                       )}
-                      {c.es_externa && (
+                      {c?.es_externa && (
                         <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-500 ring-1 ring-inset ring-sky-500/20">
                           {t('dashboard.badgeExt', 'EXT')}
                         </span>
                       )}
                     </div>
-                    <p className="text-sm font-semibold text-zinc-900 dark:text-white truncate">
-                      {nombreGrupo}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-semibold text-zinc-900 dark:text-white truncate">
+                        {nombreGrupo}
+                      </p>
+                      {cursoCodigo && (
+                        <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono">
+                          ({cursoCodigo})
+                        </span>
+                      )}
+                    </div>
                     <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate mt-0.5">
                       {tema}
                     </p>

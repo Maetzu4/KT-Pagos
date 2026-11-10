@@ -35,13 +35,21 @@ const MESES_NOMBRES = [
 /**
  * Precio efectivo de una clase.
  * Excluye Canceladas (retorna 0).
- * Utiliza precio_cobrado si existe, o la tarifa correspondiente del grupo.
+ * Para clases externas usa c.tarifas directamente.
+ * Para clases regulares usa c.grupos?.tarifas con encadenamiento seguro.
  */
 const getPrecioClase = (c) => {
   if (!c || c.estado_clase === 'Cancelada') return 0;
   if (c.precio_cobrado != null && c.precio_cobrado !== '') {
     return Number(c.precio_cobrado);
   }
+  // Clases externas: tarifa directa de la clase
+  if (c.es_externa) {
+    const tarifaExt = c.tarifas;
+    if (c.es_adicional) return Number(tarifaExt?.precio_extra ?? tarifaExt?.precio_regular ?? 0);
+    return Number(tarifaExt?.precio_regular ?? 0);
+  }
+  // Clases regulares: tarifa del grupo
   const tarifas = c.grupos?.tarifas;
   if (c.es_adicional) {
     return Number(tarifas?.precio_extra ?? tarifas?.precio_regular ?? 0);

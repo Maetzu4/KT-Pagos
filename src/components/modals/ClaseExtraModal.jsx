@@ -9,7 +9,11 @@ import { useClases } from '../../hooks/useClases';
 import { useTarifas } from '../../hooks/useTarifas';
 
 // ── Segmented tab: Interno / Externo ─────────────────────────────────────────
-function TipoSwitch({ value, onChange, t }) {
+// IMPORTANTE: TipoSwitch usa su propio hook useTranslation en lugar de recibir
+// 't' como prop, para evitar que el shadowing del parámetro en .map((t) => ...)
+// del componente padre rompa la referencia.
+function TipoSwitch({ value, onChange }) {
+  const { t } = useTranslation();
   return (
     <div className="flex gap-1 p-1 rounded-xl bg-zinc-100 dark:bg-zinc-800/60 mb-4">
       {['interno', 'externo'].map((tipo) => (
@@ -73,9 +77,11 @@ export function ClaseExtraModal({ isOpen, open, onClose, grupoPreseleccionado, o
           : g.nombre_grupo,
     }));
 
-  const tarifaOptions = (tarifas || []).map((t) => ({
-    value: String(t.id),
-    label: `${t.duracion_minutos} min — $${Number(t.precio_extra ?? t.precio_regular ?? 0).toFixed(2)} ${t('clases.extra', 'extra')}`,
+  // FIX: usar 'tarifa' (no 't') como parámetro del .map para evitar shadowing
+  // del hook useTranslation 't' que causa "TypeError: t is not a function".
+  const tarifaOptions = (tarifas || []).map((tarifa) => ({
+    value: String(tarifa.id),
+    label: `${tarifa.duracion_minutos} min — $${Number(tarifa.precio_extra ?? tarifa.precio_regular ?? 0).toFixed(2)} ${t('clases.extra', 'extra')}`,
   }));
 
   useEffect(() => {
@@ -185,7 +191,7 @@ export function ClaseExtraModal({ isOpen, open, onClose, grupoPreseleccionado, o
     <Modal open={isModalOpen} onClose={onClose} title={t('clases.addExtraClass', 'Añadir Clase Extra')} size="md">
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* ── Selector de tipo ── */}
-        <TipoSwitch value={tipoExtra} onChange={setTipoExtra} t={t} />
+        <TipoSwitch value={tipoExtra} onChange={setTipoExtra} />
 
         {tipoExtra === 'interno' ? (
           <>
