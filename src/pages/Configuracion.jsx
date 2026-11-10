@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
-import { Plus, Pencil, Trash2, Sun, Moon, LogOut, Heart, Database, Download, Upload, User, HardDrive, HelpCircle } from 'lucide-react';
+import { Plus, Pencil, Trash2, Sun, Moon, LogOut, Heart, Database, Download, Upload, User, HardDrive, HelpCircle, Globe } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { ImportadorJSON } from '../components/ImportadorJSON';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../hooks/useAuth';
@@ -94,6 +95,7 @@ function TarifaForm({ initial, onSubmit, onCancel }) {
 }
 
 export default function Configuracion() {
+  const { t, i18n } = useTranslation();
   const { mode, toggleMode } = useTheme();
   const { isOffline, user } = useAuth();
   const { tarifas, loading, createTarifa, updateTarifa, deleteTarifa } = useTarifas();
@@ -797,6 +799,52 @@ export default function Configuracion() {
             <p className="text-xs text-zinc-500 mb-3">Afecta botones, bordes activos y gráficas</p>
             <ColorPicker />
           </div>
+        </div>
+      </Card>
+
+      {/* ── Idioma / Language ── */}
+      <Card>
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-full bg-[var(--accent-color)]/10 flex items-center justify-center shrink-0">
+            <Globe size={18} className="text-[var(--accent-color)]" />
+          </div>
+          <div>
+            <h2 className="text-sm font-semibold text-zinc-900 dark:text-white uppercase tracking-wider">
+              Idioma / Language
+            </h2>
+            <p className="text-xs text-zinc-500 mt-0.5">
+              {i18n.language?.startsWith('es')
+                ? 'Selecciona el idioma de la aplicación'
+                : 'Select the application language'}
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 max-w-sm">
+          <button
+            type="button"
+            onClick={() => i18n.changeLanguage('en')}
+            className={`flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border text-xs sm:text-sm font-semibold transition-all duration-200 cursor-pointer ${
+              !i18n.language?.startsWith('es')
+                ? 'bg-[var(--accent-color)] text-white border-[var(--accent-color)] shadow-sm'
+                : 'bg-zinc-100 dark:bg-zinc-800/60 text-zinc-600 dark:text-zinc-400 border-transparent hover:text-zinc-900 dark:hover:text-white'
+            }`}
+          >
+            <span>🇺🇸</span>
+            <span>English</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => i18n.changeLanguage('es')}
+            className={`flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border text-xs sm:text-sm font-semibold transition-all duration-200 cursor-pointer ${
+              i18n.language?.startsWith('es')
+                ? 'bg-[var(--accent-color)] text-white border-[var(--accent-color)] shadow-sm'
+                : 'bg-zinc-100 dark:bg-zinc-800/60 text-zinc-600 dark:text-zinc-400 border-transparent hover:text-zinc-900 dark:hover:text-white'
+            }`}
+          >
+            <span>🇪🇸</span>
+            <span>Español</span>
+          </button>
         </div>
       </Card>
 

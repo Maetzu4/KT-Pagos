@@ -20,6 +20,12 @@ const GRADO_OPTIONS = [
   { value: 'amazing', label: 'Amazing', sub: '+10%' },
 ];
 
+const REQUISITOS = [
+  { icon: Trophy, text: 'Al menos 10 grupos activos' },
+  { icon: CheckCircle2, text: '15+ alumnos en retención' },
+  { icon: TrendingUp, text: 'Métricas por encima de OK' },
+];
+
 const MESES_NOMBRES = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
@@ -99,12 +105,12 @@ export default function Bonos() {
   const loading = loadingPeriodos || loadingClases;
 
   // ── Grupos activos excluyendo IND (case-insensitive) ─────────────────────
-  // IND groups are individual sessions — they don't count toward the 10-group bonus requirement
+  // Los grupos IND corresponden a sesiones individuales y no computan para el bono de 10 grupos
   const gruposActivosNoIND = useMemo(() => {
-    return grupos.filter(
+    return (grupos || []).filter(
       (g) =>
-        (g.estado === 'activo' || !g.estado) &&
-        !g.nombre_grupo?.toUpperCase().includes('IND')
+        (g?.estado === 'activo' || !g?.estado) &&
+        !g?.nombre_grupo?.toUpperCase().includes('IND')
     );
   }, [grupos]);
 

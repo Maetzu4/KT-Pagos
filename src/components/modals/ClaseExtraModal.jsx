@@ -23,7 +23,7 @@ function TipoSwitch({ value, onChange }) {
               : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200',
           ].join(' ')}
         >
-          {tipo === 'interno' ? '🏠 Interno' : '🌐 Externo (CSL / Reemplazo)'}
+          {tipo === 'interno' ? 'Interna' : 'Externa'}
         </button>
       ))}
     </div>
